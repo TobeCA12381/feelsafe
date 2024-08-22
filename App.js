@@ -73,8 +73,8 @@ export default function App() {
         initialRegion={{
           latitude: (origin.latitude + destination.latitude) / 2,
           longitude: (origin.longitude + destination.longitude) / 2,
-          latitudeDelta: 0.015,
-          longitudeDelta: 0.015,
+          latitudeDelta: 0.007,
+          longitudeDelta: 0.007,
         }}
         scrollEnabled={false}      // Disable map scrolling
         zoomEnabled={true}        // Disable zooming
