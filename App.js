@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, View, TextInput, Alert, TouchableOpacity, Text } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
-import * as Location from 'expo-location'; // Módulo para la ubicación
+import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 
 const GOOGLE_MAPS_APIKEY = 'AIzaSyBED0tLYXBuAV-W_Ms8GO2_mAMvCHhOdA8'; // Reemplaza con tu clave API válida
@@ -13,9 +13,26 @@ export default function MapScreen({ navigation }) {
   const [originInput, setOriginInput] = useState('');
   const [destinationInput, setDestinationInput] = useState('');
   const [selectingOrigin, setSelectingOrigin] = useState(true);
-  const [travelMode, setTravelMode] = useState('walking'); // Modo de viaje por defecto
+  const [travelMode, setTravelMode] = useState('walking');
+  const [dangerZones, setDangerZones] = useState([
+    { latitude: -11.984, longitude: -77.007, description: 'Zona peligrosa 1' },
+    { latitude: -11.982, longitude: -77.003, description: 'Zona peligrosa 2' },
+  ]);
+  const [mapRegion, setMapRegion] = useState({
+    latitude: -11.985,
+    longitude: -77.005,
+    latitudeDelta: 0.007,
+    longitudeDelta: 0.007,
+  });
 
-  // Función para decodificar la polilínea del resultado de la API de Google Directions
+  const updateMapRegion = useCallback((coordinate) => {
+    setMapRegion(prevRegion => ({
+      ...prevRegion,
+      latitude: coordinate.latitude,
+      longitude: coordinate.longitude,
+    }));
+  }, []);
+
   const decodePolyline = (t) => {
     let index = 0, len = t.length;
     let lat = 0, lng = 0;
@@ -46,14 +63,15 @@ export default function MapScreen({ navigation }) {
     return coordinates;
   };
 
-  // Función para buscar la ruta entre origen y destino
-  const fetchRoute = async () => {
+  const fetchRoute = useCallback(async () => {
     if (!origin || !destination) return;
+
     try {
       const response = await fetch(
         `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&mode=${travelMode}&key=${GOOGLE_MAPS_APIKEY}`
       );
       const data = await response.json();
+
       if (data.routes.length > 0) {
         const points = data.routes[0].overview_polyline.points;
         const decodedPoints = decodePolyline(points);
@@ -63,10 +81,21 @@ export default function MapScreen({ navigation }) {
       console.error(error);
       Alert.alert('Error al generar la ruta', error.message);
     }
-  };
+  }, [origin, destination, travelMode]);
 
-  // Función que busca la dirección de acuerdo a las coordenadas proporcionadas
-  const reverseGeocodeCoordinate = async (coordinate, setInput, updateRoute = false) => {
+  useEffect(() => {
+    if (origin && destination) {
+      fetchRoute();
+    }
+  }, [origin, destination, travelMode, fetchRoute]);
+
+  const handleMarkerDragEnd = useCallback((coordinate, setCoordinate, setInput) => {
+    setCoordinate(coordinate);
+    updateMapRegion(coordinate);
+    reverseGeocodeCoordinate(coordinate, setInput);
+  }, [updateMapRegion]);
+
+  const reverseGeocodeCoordinate = useCallback(async (coordinate, setInput) => {
     try {
       const response = await fetch(
         `https://maps.googleapis.com/maps/api/geocode/json?latlng=${coordinate.latitude},${coordinate.longitude}&key=${GOOGLE_MAPS_APIKEY}`
@@ -75,28 +104,33 @@ export default function MapScreen({ navigation }) {
       if (data.results.length > 0) {
         const address = data.results[0].formatted_address;
         setInput(address);
-        if (updateRoute && destination) {
-          fetchRoute(); // Actualiza la ruta después de establecer la ubicación
-        }
       } else {
         Alert.alert('No se pudo encontrar la dirección');
       }
     } catch (error) {
       console.error(error);
     }
-  };
+  }, []);
 
-  const handleInputChange = async (text, isOrigin) => {
+  const handleInputChange = useCallback(async (text, isOrigin) => {
     if (isOrigin) {
       setOriginInput(text);
-      await geocodeAddress(text, setOrigin);
+      const coordinate = await geocodeAddress(text);
+      if (coordinate) {
+        setOrigin(coordinate);
+        updateMapRegion(coordinate);
+      }
     } else {
       setDestinationInput(text);
-      await geocodeAddress(text, setDestination);
+      const coordinate = await geocodeAddress(text);
+      if (coordinate) {
+        setDestination(coordinate);
+        updateMapRegion(coordinate);
+      }
     }
-  };
+  }, [updateMapRegion]);
 
-  const geocodeAddress = async (address, setCoordinate) => {
+  const geocodeAddress = useCallback(async (address) => {
     try {
       const response = await fetch(
         `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_APIKEY}`
@@ -104,47 +138,31 @@ export default function MapScreen({ navigation }) {
       const data = await response.json();
       if (data.results.length > 0) {
         const location = data.results[0].geometry.location;
-        setCoordinate({
+        return {
           latitude: location.lat,
           longitude: location.lng,
-        });
-        // Actualizar la ruta si ya hay un destino
-        if (destination && setCoordinate === setOrigin) {
-          fetchRoute();
-        }
-        if (origin && setCoordinate === setDestination) {
-          fetchRoute();
-        }
-      } else {
-        Alert.alert('No se pudo encontrar la dirección');
+        };
       }
     } catch (error) {
       console.error(error);
     }
-  };
+    return null;
+  }, []);
 
-  useEffect(() => {
-    if (origin && destination) {
-      fetchRoute();
-    }
-  }, [origin, destination, travelMode]);
-
-  const handleMarkerDragEnd = (coordinate, setCoordinate, setInput) => {
-    setCoordinate(coordinate);
-    reverseGeocodeCoordinate(coordinate, setInput, true);
-  };
-
-  const handleMapPress = (e) => {
+  const handleMapPress = useCallback((e) => {
     const { latitude, longitude } = e.nativeEvent.coordinate;
     const coordinate = { latitude, longitude };
+    updateMapRegion(coordinate);
     if (selectingOrigin) {
-      handleMarkerDragEnd(coordinate, setOrigin, setOriginInput);
+      setOrigin(coordinate);
+      reverseGeocodeCoordinate(coordinate, setOriginInput);
     } else {
-      handleMarkerDragEnd(coordinate, setDestination, setDestinationInput);
+      setDestination(coordinate);
+      reverseGeocodeCoordinate(coordinate, setDestinationInput);
     }
-  };
+  }, [selectingOrigin, updateMapRegion, reverseGeocodeCoordinate]);
 
-  const getCurrentLocation = async () => {
+  const getCurrentLocation = useCallback(async () => {
     let { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permiso de ubicación denegado');
@@ -155,26 +173,17 @@ export default function MapScreen({ navigation }) {
       latitude: location.coords.latitude,
       longitude: location.coords.longitude,
     };
-    // Actualiza la ubicación del origen y la ruta
     setOrigin(coordinate);
-    reverseGeocodeCoordinate(coordinate, setOriginInput, true);
-
-    // Después de establecer el origen, actualiza la ruta si hay un destino definido
-    if (destination) {
-      fetchRoute();
-    }
-  };
+    updateMapRegion(coordinate);
+    reverseGeocodeCoordinate(coordinate, setOriginInput);
+  }, [updateMapRegion, reverseGeocodeCoordinate]);
 
   return (
     <View style={styles.container}>
       <MapView
         style={styles.map}
-        initialRegion={{
-          latitude: -11.985,
-          longitude: -77.005,
-          latitudeDelta: 0.007,
-          longitudeDelta: 0.007,
-        }}
+        region={mapRegion}
+        onRegionChangeComplete={setMapRegion}
         onPress={handleMapPress}
       >
         {origin && (
@@ -183,7 +192,6 @@ export default function MapScreen({ navigation }) {
             title="Origen"
             draggable
             onDragEnd={(e) => handleMarkerDragEnd(e.nativeEvent.coordinate, setOrigin, setOriginInput)}
-            image={require('./assets/sospechoso.png')}
           />
         )}
         {destination && (
@@ -192,7 +200,6 @@ export default function MapScreen({ navigation }) {
             title="Destino"
             draggable
             onDragEnd={(e) => handleMarkerDragEnd(e.nativeEvent.coordinate, setDestination, setDestinationInput)}
-            image={require('./assets/sospechoso.png')}
           />
         )}
         {routeCoordinates.length > 0 && (
@@ -202,6 +209,15 @@ export default function MapScreen({ navigation }) {
             strokeWidth={3}
           />
         )}
+        {dangerZones.map((zone, index) => (
+          <Marker
+            key={index}
+            coordinate={{ latitude: zone.latitude, longitude: zone.longitude }}
+            title="Zona peligrosa"
+            description={zone.description}
+            pinColor="red"
+          />
+        ))}
       </MapView>
 
       <View style={styles.transportOptionsContainer}>
@@ -223,15 +239,9 @@ export default function MapScreen({ navigation }) {
         >
           <Text>Caminata</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.transportOption, travelMode === 'bicycling' && styles.selectedOption]}
-          onPress={() => setTravelMode('bicycling')}
-        >
-          <Text>Bicicleta</Text>
-        </TouchableOpacity>
+
       </View>
 
-      {/* Botón de menú */}
       <TouchableOpacity
         style={styles.menuButton}
         onPress={() => navigation.openDrawer()}
@@ -239,7 +249,6 @@ export default function MapScreen({ navigation }) {
         <Ionicons name="menu" size={30} color="black" />
       </TouchableOpacity>
 
-      {/* Botón de GPS */}
       <TouchableOpacity
         style={styles.gpsButton}
         onPress={getCurrentLocation}
