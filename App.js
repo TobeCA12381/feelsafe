@@ -23,14 +23,13 @@ export default function MapScreen({ navigation }) {
   });
   const [routeSafety, setRouteSafety] = useState('safe');
   const [safetyScore, setSafetyScore] = useState(100);
-  const [selectedZone, setSelectedZone] = useState(null); // Para las etiquetas interactivas
-  const [modalVisible, setModalVisible] = useState(false); // Modal para mostrar detalles de la zona
+  const [selectedZone, setSelectedZone] = useState(null); 
+  const [modalVisible, setModalVisible] = useState(false); 
 
   const dangerZones = useMemo(() => [
     { id: 1, latitude: -11.984, longitude: -77.007, description: 'Zona peligrosa 1', type: 'acoso', threshold: 0.001, weight: 30 },
     { id: 2, latitude: -11.982, longitude: -77.003, description: 'Zona peligrosa 2', type: 'crimen', threshold: 0.001, weight: 50 },
     { id: 3, latitude: -11.980, longitude: -77.004, description: 'Tienda 1', type: 'drogas', threshold: 0.001, weight: 20 },
-    // Más zonas peligrosas con umbrales y pesos personalizados
   ], []);
 
   const getMarkerIcon = (type) => {
@@ -53,6 +52,14 @@ export default function MapScreen({ navigation }) {
       longitude: coordinate.longitude,
     }));
   }, []);
+
+  const handleZoom = (type) => {
+    setMapRegion((prevRegion) => ({
+      ...prevRegion,
+      latitudeDelta: type === 'in' ? prevRegion.latitudeDelta / 2 : prevRegion.latitudeDelta * 2,
+      longitudeDelta: type === 'in' ? prevRegion.longitudeDelta / 2 : prevRegion.longitudeDelta * 2,
+    }));
+  };
 
   const decodePolyline = (t) => {
     let index = 0, lat = 0, lng = 0;
@@ -90,15 +97,14 @@ export default function MapScreen({ navigation }) {
         );
 
         if (distance < zone.threshold) {
-          totalDangerScore += zone.weight; // Usa los pesos personalizados
+          totalDangerScore += zone.weight;
         }
       }
     }
 
-    // Ajusta el nivel de seguridad basado en el puntaje total de peligros
     if (totalDangerScore > 100) {
       setRouteSafety('dangerous');
-      setSafetyScore(40); // Ejemplo de cálculo de puntaje basado en el peligro
+      setSafetyScore(40);
     } else if (totalDangerScore > 50) {
       setRouteSafety('moderate');
       setSafetyScore(70);
@@ -125,7 +131,6 @@ export default function MapScreen({ navigation }) {
         const decodedPoints = decodePolyline(points);
         setRouteCoordinates(decodedPoints);
 
-        // Evaluar la seguridad de la ruta generada
         checkSafety(decodedPoints);
       } else {
         Alert.alert('Error', 'No se encontraron rutas');
@@ -289,6 +294,15 @@ export default function MapScreen({ navigation }) {
         ))}
       </MapView>
 
+      <View style={styles.zoomContainer}>
+        <TouchableOpacity onPress={() => handleZoom('in')} style={styles.zoomButton}>
+          <Text style={styles.zoomText}>+</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => handleZoom('out')} style={styles.zoomButton}>
+          <Text style={styles.zoomText}>-</Text>
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.transportOptionsContainer}>
         <TouchableOpacity
           style={[styles.transportOption, travelMode === 'driving' && styles.selectedOption]}
@@ -367,20 +381,55 @@ export default function MapScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F8F8', // Fondo más suave
+    backgroundColor: '#F8F8F8',
   },
   map: {
     width: '100%',
-    height: '50%', // Ajustar el tamaño del mapa para que ocupe menos espacio
-    marginBottom: 10, // Agregar margen inferior para separar del contenido
+    height: '50%',
+    marginBottom: 10,
   },
+  zoomContainer: {
+    position: 'absolute',
+    right: 0,
+    bottom: 430, // Mantiene la posición que elegiste
+    flexDirection: 'column',
+    borderRadius: 10, // Bordes más redondeados
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    alignItems: 'center',
+    zIndex: 1,  // Asegura que los botones estén sobre el mapa
+    shadowColor: '#000', // Color de la sombra
+    shadowOffset: { width: 0, height: 4 }, // Desplazamiento de la sombra
+    shadowOpacity: 0.25, // Opacidad de la sombra
+    shadowRadius: 4,  // Radio de la sombra
+
+},
+zoomButton: {
+    backgroundColor: '#FFF', // Fondo blanco
+    borderRadius: 50, // Forma redonda
+    width: 50, // Ancho del botón
+    height: 50, // Altura del botón
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 5, // Espacio entre los botones
+    shadowColor: '#000', // Sombra para los botones
+    shadowOffset: { width: 0, height: 2 }, // Desplazamiento de la sombra
+    shadowOpacity: 0.2, // Opacidad de la sombra
+    shadowRadius: 3,  // Radio de la sombra
+    elevation: 3,  // Elevación para sombra en Android
+},
+zoomButtonText: {
+    fontSize: 24, // Tamaño del texto para que sea visible
+    color: '#333', // Color del texto
+},
+
   inputContainer: {
     width: '100%',
     backgroundColor: '#FFF8E1',
     padding: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10, // Espacio entre entradas y botones
+    marginBottom: 10,
   },
   input: {
     width: '90%',
@@ -388,7 +437,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ECECEC',
     color: '#333',
     borderRadius: 10,
-    paddingHorizontal: 15, // Más relleno en los costados para mejor legibilidad
+    paddingHorizontal: 15,
     marginBottom: 10,
     borderWidth: 1,
     borderColor: '#C5C5C5',
@@ -401,7 +450,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     padding: 10,
     borderRadius: 25,
-    shadowOpacity: 0.3, // Sombra para darle un efecto flotante
+    shadowOpacity: 0.3,
     shadowRadius: 3,
     shadowOffset: { width: 0, height: 2 },
   },
@@ -419,16 +468,16 @@ const styles = StyleSheet.create({
   },
   transportOptionsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around', // Distribuir los botones de manera uniforme
+    justifyContent: 'space-around',
     backgroundColor: '#FFF8E1',
     paddingVertical: 15,
-    marginBottom: 10, // Espacio debajo de los botones
+    marginBottom: 10,
   },
   transportOption: {
     paddingVertical: 12,
     paddingHorizontal: 20,
     backgroundColor: '#E0E0E0',
-    borderRadius: 30, // Bordes más redondeados
+    borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
     shadowOpacity: 0.2,
@@ -436,7 +485,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
   },
   selectedOption: {
-    backgroundColor: '#82B1FF', // Color más suave para opción seleccionada
+    backgroundColor: '#82B1FF',
   },
   safetyIndicator: {
     alignItems: 'center',
