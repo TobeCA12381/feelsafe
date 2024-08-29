@@ -4,11 +4,9 @@ import MapView, { Marker, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@react-navigation/native';
-import { AnimatedRegion } from 'react-native-maps';
-
 
 const GOOGLE_MAPS_APIKEY = 'AIzaSyBbrJUdLQRmOA2lXi0KYXy30Sm8HTk8WvY';
-const UMBRAL_PELIGRO_METROS = 100; // Por ejemplo, 100 metros
+const UMBRAL_PELIGRO_METROS = 100;
 
 export default function PantallaMapa({ navigation }) {
   const { colors } = useTheme();
@@ -26,7 +24,6 @@ export default function PantallaMapa({ navigation }) {
   const [puntuacionSeguridad, setPuntuacionSeguridad] = useState(100);
   const [zonaSeleccionada, setZonaSeleccionada] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [rutaAlternativa, setRutaAlternativa] = useState(null);
   const [ubicacionActual, setUbicacionActual] = useState(null);
 
   const zonasPeligrosas = useMemo(() => [
@@ -39,11 +36,10 @@ export default function PantallaMapa({ navigation }) {
     { id: 7, latitude: -11.976, longitude: -77.008, descripcion: 'Robo a Vehículo', tipo: 'ROBO_A_VEHICULO', umbral: UMBRAL_PELIGRO_METROS, peso: 30 },
     { id: 8, latitude: -11.975, longitude: -77.009, descripcion: 'Sospechoso', tipo: 'SOSPECHOSO', umbral: UMBRAL_PELIGRO_METROS, peso: 25 },
     { id: 9, latitude: -11.974, longitude: -77.010, descripcion: 'Vandalismo', tipo: 'VANDALISMO', umbral: UMBRAL_PELIGRO_METROS, peso: 30 },
-], [UMBRAL_PELIGRO_METROS]);
+  ], []);
 
-  
-const obtenerIconoMarcador = useCallback((tipo) => {
-  const iconos = {
+  const obtenerIconoMarcador = useCallback((tipo) => {
+    const iconos = {
       ACOSO: require('./assets/ACOSO_Mesa_de_trabajo_1.png'),
       CRIMEN: require('./assets/CRIMEN_Mesa_de_trabajo_1.png'),
       DROGAS: require('./assets/DROGAS_Mesa_de_trabajo_1.png'),
@@ -53,11 +49,9 @@ const obtenerIconoMarcador = useCallback((tipo) => {
       ROBO_A_VEHICULO: require('./assets/ROBO_A_VEHICULO_Mesa_de_trabajo_1.png'),
       SOSPECHOSO: require('./assets/SOSPECHOSO_Mesa_de_trabajo_1.png'),
       VANDALISMO: require('./assets/VANDALISMO_Mesa_de_trabajo_1.png'),
-  };
-  return iconos[tipo] || require('./assets/VANDALISMO_Mesa_de_trabajo_1.png');
-}, []);
-
-
+    };
+    return iconos[tipo] || require('./assets/VANDALISMO_Mesa_de_trabajo_1.png');
+  }, []);
 
   const actualizarRegionMapa = useCallback((coordenada) => {
     setRegionMapa(prevRegion => ({
@@ -68,7 +62,7 @@ const obtenerIconoMarcador = useCallback((tipo) => {
   }, []);
 
   const calcularDistancia = useCallback((punto1, punto2) => {
-    const R = 6371e3; // Radio de la Tierra en metros
+    const R = 6371e3;
     const φ1 = punto1.latitude * Math.PI / 180;
     const φ2 = punto2.latitude * Math.PI / 180;
     const Δφ = (punto2.latitude - punto1.latitude) * Math.PI / 180;
@@ -79,176 +73,108 @@ const obtenerIconoMarcador = useCallback((tipo) => {
               Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-    const distancia = R * c; // en metros
-    return distancia;
-}, []);
-
-const renderZonasPeligrosas = useMemo(() => {
-  return zonasPeligrosas.map((zona) => (
-    <Marker
-    key={zona.id} // `key` debe ser estable y única
-    coordinate={{ latitude: zona.latitude, longitude: zona.longitude }}
-    title={zona.descripcion}
-    onPress={() => manejarPresionMarcador(zona)}
->
-    <Image
-        source={obtenerIconoMarcador(zona.tipo)}
-        style={{ width: 40, height: 40 }}
-    />
-</Marker>
-
-  ));
-}, [zonasPeligrosas, manejarPresionMarcador]);
-
-const verificarSeguridadLogaritmica = useCallback((coordenadasRuta, zonasPeligrosas) => {
-  let puntuacionPeligroTotal = 0;
-  let zonasPeligrosasUnicas = new Set();
-
-  coordenadasRuta.forEach((punto) => {
-      zonasPeligrosas.forEach(zona => {
-          const distancia = calcularDistancia(punto, zona);
-          if (distancia < zona.umbral) {
-              if (!zonasPeligrosasUnicas.has(zona.id)) {
-                  puntuacionPeligroTotal += zona.peso;
-                  zonasPeligrosasUnicas.add(zona.id);
-              }
-          }
-      });
-  });
-
-  console.log(`Puntuación de peligro total: ${puntuacionPeligroTotal}`);
-  
-  const porcentajeSeguridad = Math.max(0, 100 - 100 * (Math.log(puntuacionPeligroTotal + 1) / Math.log(zonasPeligrosas.length * 50 + 1)));
-  console.log(`Porcentaje de seguridad calculado (Logarítmico): ${porcentajeSeguridad}`);
-  
-  setPuntuacionSeguridad(Math.round(porcentajeSeguridad));
-
-  if (porcentajeSeguridad < 50) {
-      setSeguridadRuta('peligroso');
-  } else if (porcentajeSeguridad < 75) {
-      setSeguridadRuta('moderado');
-  } else {
-      setSeguridadRuta('seguro');
-  }
-
-  return Array.from(zonasPeligrosasUnicas);
-}, [calcularDistancia]);
-
-
-
-  const ajustarRegionMapa = () => {
-    if (coordenadasRuta.length > 0) {
-        const latitudes = coordenadasRuta.map(point => point.latitude);
-        const longitudes = coordenadasRuta.map(point => point.longitude);
-        const minLat = Math.min(...latitudes);
-        const maxLat = Math.max(...latitudes);
-        const minLon = Math.min(...longitudes);
-        const maxLon = Math.max(...longitudes);
-
-        setRegionMapa({
-            latitude: (minLat + maxLat) / 2,
-            longitude: (minLon + maxLon) / 2,
-            latitudeDelta: maxLat - minLat + 0.005,
-            longitudeDelta: maxLon - minLon + 0.005,
-        });
-    }
-};
-
-// Uso en el código
-useEffect(() => {
-  if (origen && destino) {
-      obtenerRuta();
-  }
-}, [origen, destino]);
-
-const obtenerRuta = useCallback(async () => {
-  if (!origen || !destino) {
-      Alert.alert('Error', 'Debe seleccionar un origen y un destino');
-      return;
-  }
-
-  try {
-      const urlDirecciones = `https://maps.googleapis.com/maps/api/directions/json?origin=${origen.latitude},${origen.longitude}&destination=${destino.latitude},${destino.longitude}&mode=${modoViaje}&key=${GOOGLE_MAPS_APIKEY}`;
-      const respuesta = await fetch(urlDirecciones);
-      const datos = await respuesta.json();
-
-      if (datos.status === "OK" && datos.routes.length > 0) {
-          const ruta = datos.routes[0];
-          const puntosDecodificados = decodificarPolilinea(ruta.overview_polyline.points);
-          setCoordenadasRuta(puntosDecodificados);
-
-          const puntosPeligrosos = verificarSeguridadLogaritmica(puntosDecodificados, zonasPeligrosas);
-
-          if (puntosPeligrosos.length > 0) {
-              Alert.alert('Advertencia', `La ruta pasa cerca de ${puntosPeligrosos.length} zonas peligrosas.`);
-          }
-      } else {
-          Alert.alert('Error', 'No se encontraron rutas. Por favor, verifique las ubicaciones e intente de nuevo.');
-      }
-  } catch (error) {
-      console.error('Error al obtener la ruta:', error);
-      Alert.alert('Error', 'Hubo un problema al generar la ruta. Por favor, intente de nuevo.');
-  }
-}, [origen, destino, verificarSeguridadLogaritmica]);
-
-  
- 
-  useEffect(() => {
-    if (origen && destino) {
-      obtenerRuta();
-    }
-  }, [origen, destino, modoViaje, obtenerRuta]);
-
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      if (ubicacionActual) {
-        const zonaCercana = zonasPeligrosas.find(zona => 
-          calcularDistancia(ubicacionActual, zona) < zona.umbral
-        );
-        if (zonaCercana) {
-          Alert.alert('Advertencia', `Estás entrando en una zona peligrosa: ${zonaCercana.descripcion}`);
-        }
-      }
-    }, 5000);
-
-    return () => clearInterval(intervalId);
-  }, [ubicacionActual, zonasPeligrosas, calcularDistancia]);
-  
+    return R * c;
+  }, []);
 
   const colorearRuta = useCallback((coordenadasRuta, zonasPeligrosas) => {
     const segmentosColoreados = [];
     let zonasPeligrosasUnicas = new Set();
 
     for (let i = 0; i < coordenadasRuta.length - 1; i++) {
-        const puntoInicio = coordenadasRuta[i];
-        const puntoFin = coordenadasRuta[i + 1];
-        let puntuacionPeligroTotal = 0;
+      const puntoInicio = coordenadasRuta[i];
+      const puntoFin = coordenadasRuta[i + 1];
+      let puntuacionPeligroTotal = 0;
 
-        zonasPeligrosas.forEach(zona => {
-            const distanciaInicio = calcularDistancia(puntoInicio, zona);
-            const distanciaFin = calcularDistancia(puntoFin, zona);
-            if (distanciaInicio < zona.umbral || distanciaFin < zona.umbral) {
-                puntuacionPeligroTotal += zona.peso;
-                zonasPeligrosasUnicas.add(zona.id);
-            }
-        });
-
-        let colorSegmento = '#00FF00'; // Verde por defecto (seguro)
-        if (puntuacionPeligroTotal > 50) {
-            colorSegmento = '#FF0000'; // Rojo (peligroso)
-        } else if (puntuacionPeligroTotal > 20) {
-            colorSegmento = '#FFA500'; // Naranja (moderado)
+      zonasPeligrosas.forEach(zona => {
+        const distanciaInicio = calcularDistancia(puntoInicio, zona);
+        const distanciaFin = calcularDistancia(puntoFin, zona);
+        if (distanciaInicio < zona.umbral || distanciaFin < zona.umbral) {
+          puntuacionPeligroTotal += zona.peso;
+          zonasPeligrosasUnicas.add(zona.id);
         }
+      });
 
-        segmentosColoreados.push({
-            coordenadas: [puntoInicio, puntoFin],
-            color: colorSegmento,
-        });
+      let colorSegmento = '#00FF00';
+      if (puntuacionPeligroTotal > 50) {
+        colorSegmento = '#FF0000';
+      } else if (puntuacionPeligroTotal > 20) {
+        colorSegmento = '#FFA500';
+      }
+
+      segmentosColoreados.push({
+        coordenadas: [puntoInicio, puntoFin],
+        color: colorSegmento,
+      });
     }
 
     return segmentosColoreados;
-}, [calcularDistancia]);
+  }, [calcularDistancia]);
 
+  const verificarSeguridadLogaritmica = useCallback((coordenadasRuta) => {
+    let puntuacionPeligroTotal = 0;
+    let zonasPeligrosasUnicas = new Set();
+
+    coordenadasRuta.forEach((punto) => {
+      zonasPeligrosas.forEach(zona => {
+        const distancia = calcularDistancia(punto, zona);
+        if (distancia < zona.umbral) {
+          if (!zonasPeligrosasUnicas.has(zona.id)) {
+            puntuacionPeligroTotal += zona.peso;
+            zonasPeligrosasUnicas.add(zona.id);
+          }
+        }
+      });
+    });
+
+    const porcentajeSeguridad = Math.max(0, 100 - 100 * (Math.log(puntuacionPeligroTotal + 1) / Math.log(zonasPeligrosas.length * 50 + 1)));
+    setPuntuacionSeguridad(Math.round(porcentajeSeguridad));
+
+    if (porcentajeSeguridad < 50) {
+      setSeguridadRuta('peligroso');
+    } else if (porcentajeSeguridad < 75) {
+      setSeguridadRuta('moderado');
+    } else {
+      setSeguridadRuta('seguro');
+    }
+
+    return Array.from(zonasPeligrosasUnicas);
+  }, [calcularDistancia]);
+
+  const obtenerRuta = useCallback(async () => {
+    if (!origen || !destino) {
+      Alert.alert('Error', 'Debe seleccionar un origen y un destino');
+      return;
+    }
+
+    try {
+      const urlDirecciones = `https://maps.googleapis.com/maps/api/directions/json?origin=${origen.latitude},${origen.longitude}&destination=${destino.latitude},${destino.longitude}&mode=${modoViaje}&key=${GOOGLE_MAPS_APIKEY}`;
+      const respuesta = await fetch(urlDirecciones);
+      const datos = await respuesta.json();
+
+      if (datos.status === "OK" && datos.routes.length > 0) {
+        const ruta = datos.routes[0];
+        const puntosDecodificados = decodificarPolilinea(ruta.overview_polyline.points);
+        setCoordenadasRuta(puntosDecodificados);
+
+        const puntosPeligrosos = verificarSeguridadLogaritmica(puntosDecodificados);
+
+        if (puntosPeligrosos.length > 0) {
+          Alert.alert('Advertencia', `La ruta pasa cerca de ${puntosPeligrosos.length} zonas peligrosas.`);
+        }
+      } else {
+        Alert.alert('Error', 'No se encontraron rutas. Por favor, verifique las ubicaciones e intente de nuevo.');
+      }
+    } catch (error) {
+      console.error('Error al obtener la ruta:', error);
+      Alert.alert('Error', 'Hubo un problema al generar la ruta. Por favor, intente de nuevo.');
+    }
+  }, [origen, destino, verificarSeguridadLogaritmica]);
+
+  useEffect(() => {
+    if (origen && destino) {
+      obtenerRuta();
+    }
+  }, [origen, destino, modoViaje, obtenerRuta]);
 
   const obtenerUbicacionActual = useCallback(async () => {
     let { status } = await Location.requestForegroundPermissionsAsync();
@@ -266,8 +192,6 @@ const obtenerRuta = useCallback(async () => {
     actualizarRegionMapa(coordenada);
     geocodificarInversoCoordenada(coordenada, setInputOrigen);
   }, [actualizarRegionMapa, geocodificarInversoCoordenada]);
-
-  
 
   const decodificarPolilinea = useCallback((t) => {
     let index = 0, lat = 0, lng = 0;
@@ -293,6 +217,7 @@ const obtenerRuta = useCallback(async () => {
     }
     return coordenadas;
   }, []);
+
   const manejarPresionMarcador = useCallback((zona) => {
     setZonaSeleccionada(zona);
     setModalVisible(true);
@@ -341,30 +266,29 @@ const obtenerRuta = useCallback(async () => {
 
   const geocodificarDireccion = useCallback(async (direccion) => {
     if (!direccion) {
-        Alert.alert('Error', 'Por favor, ingrese una dirección válida.');
-        return null;
+      Alert.alert('Error', 'Por favor, ingrese una dirección válida.');
+      return null;
     }
 
     try {
-        const respuesta = await fetch(
-            `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(direccion)}&key=${GOOGLE_MAPS_APIKEY}`
-        );
-        const datos = await respuesta.json();
+      const respuesta = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(direccion)}&key=${GOOGLE_MAPS_APIKEY}`
+      );
+      const datos = await respuesta.json();
 
-        if (datos.status === 'OK' && datos.results.length > 0) {
-            const ubicacion = datos.results[0].geometry.location;
-            return { latitude: ubicacion.lat, longitude: ubicacion.lng };
-        } else {
-            Alert.alert('Error', 'No se pudo geocodificar la dirección. Verifique la dirección e intente nuevamente.');
-            return null;
-        }
-    } catch (error) {
-        console.error('Error en la geocodificación de la dirección:', error);
-        Alert.alert('Error', 'Hubo un problema al procesar la dirección. Intente nuevamente más tarde.');
+      if (datos.status === 'OK' && datos.results.length > 0) {
+        const ubicacion = datos.results[0].geometry.location;
+        return { latitude: ubicacion.lat, longitude: ubicacion.lng };
+      } else {
+        Alert.alert('Error', 'No se pudo geocodificar la dirección. Verifique la dirección e intente nuevamente.');
         return null;
+      }
+    } catch (error) {
+      console.error('Error en la geocodificación de la dirección:', error);
+      Alert.alert('Error', 'Hubo un problema al procesar la dirección. Intente nuevamente más tarde.');
+      return null;
     }
-}, []);
-
+  }, []);
 
   const manejarPresionMapa = useCallback((e) => {
     const { latitude, longitude } = e.nativeEvent.coordinate;
@@ -395,7 +319,6 @@ const obtenerRuta = useCallback(async () => {
         onRegionChangeComplete={setRegionMapa}
         onPress={manejarPresionMapa}
       >
-        {renderZonasPeligrosas}
         {origen && (
           <Marker
             coordinate={origen}
@@ -412,35 +335,27 @@ const obtenerRuta = useCallback(async () => {
             onDragEnd={(e) => manejarFinArrastreMarcador(e.nativeEvent.coordinate, setDestino, setInputDestino)}
           />
         )}
-        {coordenadasRuta.length > 0 && (
-        <Polyline
-        coordinates={coordenadasRuta} // `coordenadasRuta` contiene los puntos decodificados
-        strokeColor={seguridadRuta === 'peligroso' ? '#FF0000' : seguridadRuta === 'moderado' ? '#FFA500' : '#00FF00'}
-        strokeWidth={3}
-    />
-    
-        )}
-        {rutaAlternativa && (
+        {colorearRuta(coordenadasRuta, zonasPeligrosas).map((segmento, index) => (
           <Polyline
-            coordinates={rutaAlternativa}
-            strokeColor="#0000FF"
+            key={index}
+            coordinates={segmento.coordenadas}
+            strokeColor={segmento.color}
             strokeWidth={3}
           />
-        )}
+        ))}
         {zonasPeligrosas.map((zona) => (
-    <Marker
-        key={zona.id}
-        coordinate={{ latitude: zona.latitude, longitude: zona.longitude }}
-        title={zona.descripcion}
-        onPress={() => manejarPresionMarcador(zona)}
-    >
-        <Image
-            source={obtenerIconoMarcador(zona.tipo)}
-            style={{ width: 40, height: 40 }}
-        />
-    </Marker>
-))}
-
+          <Marker
+            key={zona.id}
+            coordinate={{ latitude: zona.latitude, longitude: zona.longitude }}
+            title={zona.descripcion}
+            onPress={() => manejarPresionMarcador(zona)}
+          >
+            <Image
+              source={obtenerIconoMarcador(zona.tipo)}
+              style={{ width: 40, height: 40 }}
+            />
+          </Marker>
+        ))}
       </MapView>
 
       <View style={estilos.contenedorZoom}>
@@ -453,14 +368,13 @@ const obtenerRuta = useCallback(async () => {
       </View>
 
       <TouchableOpacity
-    accessible={true}
-    accessibilityLabel="Botón de menú"
-    style={estilos.botonMenu}
-    onPress={() => navigation.openDrawer()}
->
-    <Ionicons name="menu" size={30} color={colors.text} />
-</TouchableOpacity>
-
+        accessible={true}
+        accessibilityLabel="Botón de menú"
+        style={estilos.botonMenu}
+        onPress={() => navigation.openDrawer()}
+      >
+        <Ionicons name="menu" size={30} color={colors.text} />
+      </TouchableOpacity>
 
       <TouchableOpacity
         style={estilos.botonGPS}
@@ -520,10 +434,6 @@ const obtenerRuta = useCallback(async () => {
     </View>
   );
 }
-
-
-
-
 
 const estilos = StyleSheet.create({
   contenedor: {
@@ -591,11 +501,11 @@ const estilos = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2
+      height: 2,
     },
     shadowOpacity: 0.25,
     shadowRadius: 4,
-    elevation: 5
+    elevation: 5,
   },
   textoModal: {
     marginBottom: 15,
