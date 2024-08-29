@@ -96,9 +96,30 @@ export default function PantallaMapa({ navigation }) {
     return [...zonasPeligrosasUnicas]; // Devolvemos las zonas peligrosas únicas
   }, [zonasPeligrosas, calcularDistancia]);
 
+  const ajustarRegionMapa = () => {
+    if (coordenadasRuta.length > 0) {
+        const latitudes = coordenadasRuta.map(point => point.latitude);
+        const longitudes = coordenadasRuta.map(point => point.longitude);
+        const minLat = Math.min(...latitudes);
+        const maxLat = Math.max(...latitudes);
+        const minLon = Math.min(...longitudes);
+        const maxLon = Math.max(...longitudes);
+
+        setRegionMapa({
+            latitude: (minLat + maxLat) / 2,
+            longitude: (minLon + maxLon) / 2,
+            latitudeDelta: maxLat - minLat + 0.005,
+            longitudeDelta: maxLon - minLon + 0.005,
+        });
+    }
+};
+
+useEffect(() => {
+    ajustarRegionMapa();
+}, [coordenadasRuta]);
+
 
   
- 
   const obtenerRuta = useCallback(async () => {
     if (!origen || !destino) {
         Alert.alert('Error', 'Debe seleccionar un origen y un destino');
@@ -131,10 +152,10 @@ console.log('Puntos decodificados:', puntosDecodificados);
           console.log(`Distancia total: ${distanciaTotal / 1000} km`);
           console.log(`Duración estimada: ${Math.round(duracionTotal / 60)} minutos`);
       
-          const puntosPeligrosos = verificarSeguridad(puntosDecodificados);
+          const puntosPeligrosos = verificarSeguridad(coordenadasRuta);
           if (puntosPeligrosos.length > 0) {
               Alert.alert('Advertencia', `La ruta pasa cerca de ${puntosPeligrosos.length} zonas peligrosas.`);
-          }
+          }          
       } else {
           Alert.alert('Error', 'No se encontraron rutas. Por favor, verifique las ubicaciones e intente de nuevo.');
       }
@@ -327,11 +348,12 @@ console.log('Puntos decodificados:', puntosDecodificados);
           />
         )}
         {coordenadasRuta.length > 0 && (
-          <Polyline
-            coordinates={coordenadasRuta}
-            strokeColor={seguridadRuta === 'peligroso' ? '#FF0000' : seguridadRuta === 'moderado' ? '#FFA500' : '#00FF00'}
-            strokeWidth={3}
-          />
+        <Polyline
+        coordinates={coordenadasRuta} // `coordenadasRuta` contiene los puntos decodificados
+        strokeColor={seguridadRuta === 'peligroso' ? '#FF0000' : seguridadRuta === 'moderado' ? '#FFA500' : '#00FF00'}
+        strokeWidth={3}
+    />
+    
         )}
         {rutaAlternativa && (
           <Polyline
@@ -432,6 +454,7 @@ console.log('Puntos decodificados:', puntosDecodificados);
     </View>
   );
 }
+
 
 
 
