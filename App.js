@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@react-navigation/native';
 import { AnimatedRegion } from 'react-native-maps';
 
+
 const GOOGLE_MAPS_APIKEY = 'AIzaSyBbrJUdLQRmOA2lXi0KYXy30Sm8HTk8WvY';
 const UMBRAL_PELIGRO_METROS = 100; // Por ejemplo, 100 metros
 
@@ -29,19 +30,33 @@ export default function PantallaMapa({ navigation }) {
   const [ubicacionActual, setUbicacionActual] = useState(null);
 
   const zonasPeligrosas = useMemo(() => [
-    { id: 1, latitude: -11.984, longitude: -77.007, descripcion: 'Zona peligrosa 1', tipo: 'acoso', umbral: UMBRAL_PELIGRO_METROS , peso: 30 },
-    { id: 2, latitude: -11.982, longitude: -77.003, descripcion: 'Zona peligrosa 2', tipo: 'crimen', umbral: UMBRAL_PELIGRO_METROS , peso: 50 },
-    { id: 3, latitude: -11.980, longitude: -77.004, descripcion: 'Tienda 1', tipo: 'drogas', umbral: UMBRAL_PELIGRO_METROS , peso: 20 },
-], []);
+    { id: 1, latitude: -11.984, longitude: -77.007, descripcion: 'Zona peligrosa 1', tipo: 'ACOSO', umbral: UMBRAL_PELIGRO_METROS, peso: 30 },
+    { id: 2, latitude: -11.982, longitude: -77.003, descripcion: 'Zona peligrosa 2', tipo: 'CRIMEN', umbral: UMBRAL_PELIGRO_METROS, peso: 50 },
+    { id: 3, latitude: -11.980, longitude: -77.004, descripcion: 'Tienda 1', tipo: 'DROGAS', umbral: UMBRAL_PELIGRO_METROS, peso: 20 },
+    { id: 4, latitude: -11.979, longitude: -77.005, descripcion: 'Robo a Casa', tipo: 'ROBO_A_CASA', umbral: UMBRAL_PELIGRO_METROS, peso: 40 },
+    { id: 5, latitude: -11.978, longitude: -77.006, descripcion: 'Robo a Comercio', tipo: 'ROBO_A_COMERCIO', umbral: UMBRAL_PELIGRO_METROS, peso: 45 },
+    { id: 6, latitude: -11.977, longitude: -77.007, descripcion: 'Robo a Persona', tipo: 'ROBO_A_PERSONA', umbral: UMBRAL_PELIGRO_METROS, peso: 35 },
+    { id: 7, latitude: -11.976, longitude: -77.008, descripcion: 'Robo a Vehículo', tipo: 'ROBO_A_VEHICULO', umbral: UMBRAL_PELIGRO_METROS, peso: 30 },
+    { id: 8, latitude: -11.975, longitude: -77.009, descripcion: 'Sospechoso', tipo: 'SOSPECHOSO', umbral: UMBRAL_PELIGRO_METROS, peso: 25 },
+    { id: 9, latitude: -11.974, longitude: -77.010, descripcion: 'Vandalismo', tipo: 'VANDALISMO', umbral: UMBRAL_PELIGRO_METROS, peso: 30 },
+], [UMBRAL_PELIGRO_METROS]);
+
   
 const obtenerIconoMarcador = useCallback((tipo) => {
   const iconos = {
-      acoso: require('./assets/ACOSO_Mesa_de_trabajo_1.png'),
-      crimen: require('./assets/CRIMEN_Mesa_de_trabajo_1.png'),
-      drogas: require('./assets/DROGAS_Mesa_de_trabajo_1.png'),
+      ACOSO: require('./assets/ACOSO_Mesa_de_trabajo_1.png'),
+      CRIMEN: require('./assets/CRIMEN_Mesa_de_trabajo_1.png'),
+      DROGAS: require('./assets/DROGAS_Mesa_de_trabajo_1.png'),
+      ROBO_A_CASA: require('./assets/ROBO_A_CASA_Mesa_de_trabajo_1.png'),
+      ROBO_A_COMERCIO: require('./assets/ROBO_A_COMERCIO_Mesa_de_trabajo_1.png'),
+      ROBO_A_PERSONA: require('./assets/ROBO_A_PERSONA_Mesa_de_trabajo_1.png'),
+      ROBO_A_VEHICULO: require('./assets/ROBO_A_VEHICULO_Mesa_de_trabajo_1.png'),
+      SOSPECHOSO: require('./assets/SOSPECHOSO_Mesa_de_trabajo_1.png'),
+      VANDALISMO: require('./assets/VANDALISMO_Mesa_de_trabajo_1.png'),
   };
-  return iconos[tipo] || require('./assets/ROBO_A_CASA_Mesa_de_trabajo_1.png');
+  return iconos[tipo] || require('./assets/VANDALISMO_Mesa_de_trabajo_1.png');
 }, []);
+
 
 
   const actualizarRegionMapa = useCallback((coordenada) => {
@@ -85,16 +100,14 @@ const renderZonasPeligrosas = useMemo(() => {
   ));
 }, [zonasPeligrosas, manejarPresionMarcador]);
 
-const verificarSeguridad = useCallback((coordenadasRuta, zonasPeligrosas) => {
+const verificarSeguridadLogaritmica = useCallback((coordenadasRuta, zonasPeligrosas) => {
   let puntuacionPeligroTotal = 0;
   let zonasPeligrosasUnicas = new Set();
 
-  coordenadasRuta.forEach((punto, index) => {
+  coordenadasRuta.forEach((punto) => {
       zonasPeligrosas.forEach(zona => {
           const distancia = calcularDistancia(punto, zona);
-          console.log(`Distancia a ${zona.descripcion} en el punto ${index}: ${distancia} metros`);
-
-          if (distancia < UMBRAL_PELIGRO_METROS) {
+          if (distancia < zona.umbral) {
               if (!zonasPeligrosasUnicas.has(zona.id)) {
                   puntuacionPeligroTotal += zona.peso;
                   zonasPeligrosasUnicas.add(zona.id);
@@ -103,14 +116,13 @@ const verificarSeguridad = useCallback((coordenadasRuta, zonasPeligrosas) => {
       });
   });
 
-  console.log(`Zonas peligrosas únicas detectadas: ${zonasPeligrosasUnicas.size}`);
   console.log(`Puntuación de peligro total: ${puntuacionPeligroTotal}`);
-
-  const porcentajeSeguridad = Math.max(0, 100 - (puntuacionPeligroTotal / (zonasPeligrosas.length * 50)) * 100);
-  console.log(`Porcentaje de seguridad calculado: ${porcentajeSeguridad}`);
+  
+  const porcentajeSeguridad = Math.max(0, 100 - 100 * (Math.log(puntuacionPeligroTotal + 1) / Math.log(zonasPeligrosas.length * 50 + 1)));
+  console.log(`Porcentaje de seguridad calculado (Logarítmico): ${porcentajeSeguridad}`);
   
   setPuntuacionSeguridad(Math.round(porcentajeSeguridad));
-  
+
   if (porcentajeSeguridad < 50) {
       setSeguridadRuta('peligroso');
   } else if (porcentajeSeguridad < 75) {
@@ -147,9 +159,8 @@ useEffect(() => {
   if (origen && destino) {
       obtenerRuta();
   }
-}, [origen, destino, verificarSeguridad]);
+}, [origen, destino]);
 
-// Ejemplo de uso dentro de obtenerRuta
 const obtenerRuta = useCallback(async () => {
   if (!origen || !destino) {
       Alert.alert('Error', 'Debe seleccionar un origen y un destino');
@@ -166,7 +177,8 @@ const obtenerRuta = useCallback(async () => {
           const puntosDecodificados = decodificarPolilinea(ruta.overview_polyline.points);
           setCoordenadasRuta(puntosDecodificados);
 
-          const puntosPeligrosos = verificarSeguridad(puntosDecodificados, zonasPeligrosas);
+          const puntosPeligrosos = verificarSeguridadLogaritmica(puntosDecodificados, zonasPeligrosas);
+
           if (puntosPeligrosos.length > 0) {
               Alert.alert('Advertencia', `La ruta pasa cerca de ${puntosPeligrosos.length} zonas peligrosas.`);
           }
@@ -177,7 +189,7 @@ const obtenerRuta = useCallback(async () => {
       console.error('Error al obtener la ruta:', error);
       Alert.alert('Error', 'Hubo un problema al generar la ruta. Por favor, intente de nuevo.');
   }
-}, [origen, destino, verificarSeguridad]);
+}, [origen, destino, verificarSeguridadLogaritmica]);
 
   
  
@@ -378,18 +390,19 @@ const obtenerRuta = useCallback(async () => {
           />
         )}
         {zonasPeligrosas.map((zona) => (
-          <Marker
-            key={zona.id}
-            coordinate={{ latitude: zona.latitude, longitude: zona.longitude }}
-            title={zona.descripcion}
-            onPress={() => manejarPresionMarcador(zona)}
-          >
-            <Image
-              source={obtenerIconoMarcador(zona.tipo)}
-              style={{ width: 40, height: 40 }}
-            />
-          </Marker>
-        ))}
+    <Marker
+        key={zona.id}
+        coordinate={{ latitude: zona.latitude, longitude: zona.longitude }}
+        title={zona.descripcion}
+        onPress={() => manejarPresionMarcador(zona)}
+    >
+        <Image
+            source={obtenerIconoMarcador(zona.tipo)}
+            style={{ width: 40, height: 40 }}
+        />
+    </Marker>
+))}
+
       </MapView>
 
       <View style={estilos.contenedorZoom}>
