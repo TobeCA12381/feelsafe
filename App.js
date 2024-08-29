@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@react-navigation/native';
 
 const GOOGLE_MAPS_APIKEY = 'AIzaSyBbrJUdLQRmOA2lXi0KYXy30Sm8HTk8WvY';
-const UMBRAL_PELIGRO = 0.001; // Aproximadamente 100 metros
+const UMBRAL_PELIGRO = 0.00075; // Aproximadamente 100 metros
 
 export default function PantallaMapa({ navigation }) {
   const { colors } = useTheme();
@@ -58,60 +58,36 @@ export default function PantallaMapa({ navigation }) {
 
   const verificarSeguridad = useCallback((coordenadasRuta) => {
     let puntuacionPeligroTotal = 0;
-    let puntosPeligrosos = [];
-
+    let zonasPeligrosasUnicas = new Set();
+  
     coordenadasRuta.forEach((punto, index) => {
       zonasPeligrosas.forEach(zona => {
         const distancia = calcularDistancia(punto, zona);
         if (distancia < zona.umbral) {
           puntuacionPeligroTotal += zona.peso;
-          puntosPeligrosos.push({ index, zona });
+          zonasPeligrosasUnicas.add(zona.id); // Usamos el ID para asegurar que cada zona se cuente una vez
         }
       });
     });
 
     const porcentajeSeguridad = Math.max(0, 100 - (puntuacionPeligroTotal / coordenadasRuta.length) * 100);
     setPuntuacionSeguridad(Math.round(porcentajeSeguridad));
-
+  
     if (porcentajeSeguridad < 50) {
       setSeguridadRuta('peligroso');
-      generarRutaAlternativa(puntosPeligrosos);
+     
     } else if (porcentajeSeguridad < 75) {
       setSeguridadRuta('moderado');
     } else {
       setSeguridadRuta('seguro');
     }
-
-    return puntosPeligrosos;
+  
+    return [...zonasPeligrosasUnicas]; // Devolvemos las zonas peligrosas únicas
   }, [zonasPeligrosas, calcularDistancia]);
-  const generarRutaAlternativa = useCallback(async (puntosPeligrosos) => {
-    if (puntosPeligrosos.length === 0) return;
 
-    const waypoints = puntosPeligrosos.map(punto => {
-      const { latitude, longitude } = coordenadasRuta[punto.index];
-      return `${latitude},${longitude}`;
-    });
 
-    try {
-      const urlDirecciones = `https://maps.googleapis.com/maps/api/directions/json?origin=${origen.latitude},${origen.longitude}&destination=${destino.latitude},${destino.longitude}&waypoints=optimize:true|${waypoints.join('|')}&mode=${modoViaje}&key=${GOOGLE_MAPS_APIKEY}`;
-
-      const respuesta = await fetch(urlDirecciones);
-      const datos = await respuesta.json();
-
-      if (datos.status === "OK" && datos.routes.length > 0) {
-        const puntos = datos.routes[0].overview_polyline.points;
-        const puntosDecodificados = decodificarPolilinea(puntos);
-        setRutaAlternativa(puntosDecodificados);
-        Alert.alert('Ruta Alternativa', 'Se ha generado una ruta alternativa más segura. ¿Desea utilizarla?', [
-          { text: 'No', style: 'cancel' },
-          { text: 'Sí', onPress: () => setCoordenadasRuta(puntosDecodificados) }
-        ]);
-      }
-    } catch (error) {
-      console.error('Error al generar ruta alternativa:', error);
-    }
-  }, [origen, destino, modoViaje, coordenadasRuta, decodificarPolilinea]);
-
+  
+ 
   const obtenerRuta = useCallback(async () => {
     if (!origen || !destino) {
       Alert.alert('Error', 'Debe seleccionar un origen y un destino');
@@ -121,12 +97,8 @@ export default function PantallaMapa({ navigation }) {
     try {
       const urlDirecciones = `https://maps.googleapis.com/maps/api/directions/json?origin=${origen.latitude},${origen.longitude}&destination=${destino.latitude},${destino.longitude}&mode=${modoViaje}&key=${GOOGLE_MAPS_APIKEY}`;
   
-      console.log('URL de la solicitud:', urlDirecciones);
-  
       const respuesta = await fetch(urlDirecciones);
       const datos = await respuesta.json();
-  
-      console.log('Respuesta de la API:', datos);
   
       if (datos.status === "OK" && datos.routes.length > 0) {
         const ruta = datos.routes[0];
@@ -134,12 +106,8 @@ export default function PantallaMapa({ navigation }) {
         const puntosDecodificados = decodificarPolilinea(puntos);
         setCoordenadasRuta(puntosDecodificados);
   
-        // Calcular la distancia total y la duración
         const distanciaTotal = ruta.legs.reduce((total, leg) => total + leg.distance.value, 0);
         const duracionTotal = ruta.legs.reduce((total, leg) => total + leg.duration.value, 0);
-  
-        console.log(`Distancia total: ${distanciaTotal / 1000} km`);
-        console.log(`Duración estimada: ${Math.round(duracionTotal / 60)} minutos`);
   
         const puntosPeligrosos = verificarSeguridad(puntosDecodificados);
         if (puntosPeligrosos.length > 0) {
@@ -153,6 +121,8 @@ export default function PantallaMapa({ navigation }) {
       Alert.alert('Error', 'Hubo un problema al generar la ruta. Por favor, intente de nuevo.');
     }
   }, [origen, destino, modoViaje, decodificarPolilinea, verificarSeguridad]);
+  
+ 
   useEffect(() => {
     if (origen && destino) {
       obtenerRuta();
