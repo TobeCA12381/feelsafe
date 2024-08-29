@@ -4,6 +4,7 @@ import MapView, { Marker, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@react-navigation/native';
+import { AnimatedRegion } from 'react-native-maps';
 
 const GOOGLE_MAPS_APIKEY = 'AIzaSyBbrJUdLQRmOA2lXi0KYXy30Sm8HTk8WvY';
 const UMBRAL_PELIGRO = 0.00075; // Aproximadamente 100 metros
@@ -50,11 +51,21 @@ export default function PantallaMapa({ navigation }) {
   }, []);
 
   const calcularDistancia = useCallback((punto1, punto2) => {
-    return Math.sqrt(
-      Math.pow(punto1.latitude - punto2.latitude, 2) +
-      Math.pow(punto1.longitude - punto2.longitude, 2)
-    );
-  }, []);
+    const R = 6371e3; // Radio de la Tierra en metros
+    const φ1 = punto1.latitude * Math.PI/180;
+    const φ2 = punto2.latitude * Math.PI/180;
+    const Δφ = (punto2.latitude - punto1.latitude) * Math.PI/180;
+    const Δλ = (punto2.longitude - punto1.longitude) * Math.PI/180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    const distancia = R * c; // en metros
+    return distancia;
+}, []);
+
 
   const verificarSeguridad = useCallback((coordenadasRuta) => {
     let puntuacionPeligroTotal = 0;
@@ -90,37 +101,49 @@ export default function PantallaMapa({ navigation }) {
  
   const obtenerRuta = useCallback(async () => {
     if (!origen || !destino) {
-      Alert.alert('Error', 'Debe seleccionar un origen y un destino');
-      return;
+        Alert.alert('Error', 'Debe seleccionar un origen y un destino');
+        return;
     }
-  
+
     try {
       const urlDirecciones = `https://maps.googleapis.com/maps/api/directions/json?origin=${origen.latitude},${origen.longitude}&destination=${destino.latitude},${destino.longitude}&mode=${modoViaje}&key=${GOOGLE_MAPS_APIKEY}`;
-  
-      const respuesta = await fetch(urlDirecciones);
-      const datos = await respuesta.json();
-  
-      if (datos.status === "OK" && datos.routes.length > 0) {
-        const ruta = datos.routes[0];
-        const puntos = ruta.overview_polyline.points;
-        const puntosDecodificados = decodificarPolilinea(puntos);
-        setCoordenadasRuta(puntosDecodificados);
-  
-        const distanciaTotal = ruta.legs.reduce((total, leg) => total + leg.distance.value, 0);
-        const duracionTotal = ruta.legs.reduce((total, leg) => total + leg.duration.value, 0);
-  
-        const puntosPeligrosos = verificarSeguridad(puntosDecodificados);
-        if (puntosPeligrosos.length > 0) {
-          Alert.alert('Advertencia', `La ruta pasa cerca de ${puntosPeligrosos.length} zonas peligrosas.`);
-        }
+      console.log('URL de la solicitud:', urlDirecciones); // Log para verificar la URL
+
+        const respuesta = await fetch(urlDirecciones);
+        const datos = await respuesta.json();
+        console.log('Respuesta de la API:', datos); // Log para verificar la respuesta
+
+        if (datos.status === "OK" && datos.routes.length > 0) {
+          const ruta = datos.routes[0];
+          const puntos = ruta.overview_polyline.points;
+console.log('Polilínea codificada:', puntos);
+const puntosDecodificados = decodificarPolilinea(puntos);
+console.log('Puntos decodificados:', puntosDecodificados);
+
+          setCoordenadasRuta(puntosDecodificados); // Aquí se establece la ruta en el estado
+      
+          // Puedes loguear los puntos decodificados para asegurarte de que todo está funcionando
+          console.log('Puntos decodificados:', puntosDecodificados);
+      
+          const distanciaTotal = ruta.legs.reduce((total, leg) => total + leg.distance.value, 0);
+          const duracionTotal = ruta.legs.reduce((total, leg) => total + leg.duration.value, 0);
+      
+          console.log(`Distancia total: ${distanciaTotal / 1000} km`);
+          console.log(`Duración estimada: ${Math.round(duracionTotal / 60)} minutos`);
+      
+          const puntosPeligrosos = verificarSeguridad(puntosDecodificados);
+          if (puntosPeligrosos.length > 0) {
+              Alert.alert('Advertencia', `La ruta pasa cerca de ${puntosPeligrosos.length} zonas peligrosas.`);
+          }
       } else {
-        Alert.alert('Error', 'No se encontraron rutas. Por favor, verifique las ubicaciones e intente de nuevo.');
+          Alert.alert('Error', 'No se encontraron rutas. Por favor, verifique las ubicaciones e intente de nuevo.');
       }
     } catch (error) {
-      console.error('Error al obtener la ruta:', error);
-      Alert.alert('Error', 'Hubo un problema al generar la ruta. Por favor, intente de nuevo.');
+        console.error('Error al obtener la ruta:', error);
+        Alert.alert('Error', 'Hubo un problema al generar la ruta. Por favor, intente de nuevo.');
     }
-  }, [origen, destino, modoViaje, decodificarPolilinea, verificarSeguridad]);
+}, [origen, destino, modoViaje, decodificarPolilinea, verificarSeguridad]);
+
   
  
   useEffect(() => {
@@ -232,20 +255,31 @@ export default function PantallaMapa({ navigation }) {
   }, [actualizarRegionMapa, geocodificarDireccion]);
 
   const geocodificarDireccion = useCallback(async (direccion) => {
-    try {
-      const respuesta = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(direccion)}&key=${GOOGLE_MAPS_APIKEY}`
-      );
-      const datos = await respuesta.json();
-      if (datos.results.length > 0) {
-        const ubicacion = datos.results[0].geometry.location;
-        return { latitude: ubicacion.lat, longitude: ubicacion.lng };
-      }
-    } catch (error) {
-      console.error('Error en la geocodificación de la dirección:', error);
+    if (!direccion) {
+        Alert.alert('Error', 'Por favor, ingrese una dirección válida.');
+        return null;
     }
-    return null;
-  }, []);
+
+    try {
+        const respuesta = await fetch(
+            `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(direccion)}&key=${GOOGLE_MAPS_APIKEY}`
+        );
+        const datos = await respuesta.json();
+
+        if (datos.status === 'OK' && datos.results.length > 0) {
+            const ubicacion = datos.results[0].geometry.location;
+            return { latitude: ubicacion.lat, longitude: ubicacion.lng };
+        } else {
+            Alert.alert('Error', 'No se pudo geocodificar la dirección. Verifique la dirección e intente nuevamente.');
+            return null;
+        }
+    } catch (error) {
+        console.error('Error en la geocodificación de la dirección:', error);
+        Alert.alert('Error', 'Hubo un problema al procesar la dirección. Intente nuevamente más tarde.');
+        return null;
+    }
+}, []);
+
 
   const manejarPresionMapa = useCallback((e) => {
     const { latitude, longitude } = e.nativeEvent.coordinate;
@@ -331,11 +365,14 @@ export default function PantallaMapa({ navigation }) {
       </View>
 
       <TouchableOpacity
-        style={estilos.botonMenu}
-        onPress={() => navigation.openDrawer()}
-      >
-        <Ionicons name="menu" size={30} color={colors.text} />
-      </TouchableOpacity>
+    accessible={true}
+    accessibilityLabel="Botón de menú"
+    style={estilos.botonMenu}
+    onPress={() => navigation.openDrawer()}
+>
+    <Ionicons name="menu" size={30} color={colors.text} />
+</TouchableOpacity>
+
 
       <TouchableOpacity
         style={estilos.botonGPS}
@@ -395,6 +432,9 @@ export default function PantallaMapa({ navigation }) {
     </View>
   );
 }
+
+
+
 
 const estilos = StyleSheet.create({
   contenedor: {
