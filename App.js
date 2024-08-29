@@ -213,6 +213,42 @@ const obtenerRuta = useCallback(async () => {
 
     return () => clearInterval(intervalId);
   }, [ubicacionActual, zonasPeligrosas, calcularDistancia]);
+  
+
+  const colorearRuta = useCallback((coordenadasRuta, zonasPeligrosas) => {
+    const segmentosColoreados = [];
+    let zonasPeligrosasUnicas = new Set();
+
+    for (let i = 0; i < coordenadasRuta.length - 1; i++) {
+        const puntoInicio = coordenadasRuta[i];
+        const puntoFin = coordenadasRuta[i + 1];
+        let puntuacionPeligroTotal = 0;
+
+        zonasPeligrosas.forEach(zona => {
+            const distanciaInicio = calcularDistancia(puntoInicio, zona);
+            const distanciaFin = calcularDistancia(puntoFin, zona);
+            if (distanciaInicio < zona.umbral || distanciaFin < zona.umbral) {
+                puntuacionPeligroTotal += zona.peso;
+                zonasPeligrosasUnicas.add(zona.id);
+            }
+        });
+
+        let colorSegmento = '#00FF00'; // Verde por defecto (seguro)
+        if (puntuacionPeligroTotal > 50) {
+            colorSegmento = '#FF0000'; // Rojo (peligroso)
+        } else if (puntuacionPeligroTotal > 20) {
+            colorSegmento = '#FFA500'; // Naranja (moderado)
+        }
+
+        segmentosColoreados.push({
+            coordenadas: [puntoInicio, puntoFin],
+            color: colorSegmento,
+        });
+    }
+
+    return segmentosColoreados;
+}, [calcularDistancia]);
+
 
   const obtenerUbicacionActual = useCallback(async () => {
     let { status } = await Location.requestForegroundPermissionsAsync();
@@ -230,6 +266,8 @@ const obtenerRuta = useCallback(async () => {
     actualizarRegionMapa(coordenada);
     geocodificarInversoCoordenada(coordenada, setInputOrigen);
   }, [actualizarRegionMapa, geocodificarInversoCoordenada]);
+
+  
 
   const decodificarPolilinea = useCallback((t) => {
     let index = 0, lat = 0, lng = 0;
