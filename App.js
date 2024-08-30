@@ -182,7 +182,7 @@ export default function PantallaMapa({ navigation }) {
   }, [origen, destino, verificarSeguridadLogaritmica]);
 
   const ajustarVistaRuta = useCallback((coordenadas) => {
-    if (mapRef.current) {
+    if (mapRef.current && coordenadas.length > 0) {
       mapRef.current.fitToCoordinates(coordenadas, {
         edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
         animated: true,
