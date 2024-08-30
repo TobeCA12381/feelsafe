@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { StyleSheet, View, TextInput, Alert, TouchableOpacity, Text, Image, Modal } from 'react-native';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { StyleSheet, View, TextInput, Alert, TouchableOpacity, Text, Image, Modal, ActivityIndicator } from 'react-native';
+import MapView, { Marker, Polyline, Circle } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@react-navigation/native';
@@ -18,13 +18,18 @@ export default function PantallaMapa({ navigation }) {
   const [seleccionandoOrigen, setSeleccionandoOrigen] = useState(true);
   const [modoViaje, setModoViaje] = useState('walking');
   const [regionMapa, setRegionMapa] = useState({
-    latitude: -11.985, longitude: -77.005, latitudeDelta: 0.007, longitudeDelta: 0.007,
+    latitude: -11.985, 
+    longitude: -77.005, 
+    latitudeDelta: 0.007, 
+    longitudeDelta: 0.007,
   });
   const [seguridadRuta, setSeguridadRuta] = useState('seguro');
   const [puntuacionSeguridad, setPuntuacionSeguridad] = useState(100);
   const [zonaSeleccionada, setZonaSeleccionada] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [ubicacionActual, setUbicacionActual] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const mapRef = useRef(null); // Referencia al mapa
 
   const zonasPeligrosas = useMemo(() => [
     { id: 1, latitude: -11.984, longitude: -77.007, descripcion: 'Zona peligrosa 1', tipo: 'ACOSO', umbral: UMBRAL_PELIGRO_METROS, peso: 30 },
@@ -146,6 +151,8 @@ export default function PantallaMapa({ navigation }) {
       return;
     }
 
+    setLoading(true);
+
     try {
       const urlDirecciones = `https://maps.googleapis.com/maps/api/directions/json?origin=${origen.latitude},${origen.longitude}&destination=${destino.latitude},${destino.longitude}&mode=${modoViaje}&key=${GOOGLE_MAPS_APIKEY}`;
       const respuesta = await fetch(urlDirecciones);
@@ -155,6 +162,8 @@ export default function PantallaMapa({ navigation }) {
         const ruta = datos.routes[0];
         const puntosDecodificados = decodificarPolilinea(ruta.overview_polyline.points);
         setCoordenadasRuta(puntosDecodificados);
+
+        ajustarVistaRuta(puntosDecodificados); // Ajustar la vista después de obtener la ruta
 
         const puntosPeligrosos = verificarSeguridadLogaritmica(puntosDecodificados);
 
@@ -167,8 +176,19 @@ export default function PantallaMapa({ navigation }) {
     } catch (error) {
       console.error('Error al obtener la ruta:', error);
       Alert.alert('Error', 'Hubo un problema al generar la ruta. Por favor, intente de nuevo.');
+    } finally {
+      setLoading(false);
     }
   }, [origen, destino, verificarSeguridadLogaritmica]);
+
+  const ajustarVistaRuta = useCallback((coordenadas) => {
+    if (mapRef.current) {
+      mapRef.current.fitToCoordinates(coordenadas, {
+        edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+        animated: true,
+      });
+    }
+  }, []);
 
   useEffect(() => {
     if (origen && destino) {
@@ -177,20 +197,28 @@ export default function PantallaMapa({ navigation }) {
   }, [origen, destino, modoViaje, obtenerRuta]);
 
   const obtenerUbicacionActual = useCallback(async () => {
-    let { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permiso de ubicación denegado');
-      return;
+    setLoading(true);
+
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permiso de ubicación denegado');
+        return;
+      }
+      let ubicacion = await Location.getCurrentPositionAsync({});
+      const coordenada = {
+        latitude: ubicacion.coords.latitude,
+        longitude: ubicacion.coords.longitude,
+      };
+      setUbicacionActual(coordenada);
+      setOrigen(coordenada);
+      actualizarRegionMapa(coordenada);
+      geocodificarInversoCoordenada(coordenada, setInputOrigen);
+    } catch (error) {
+      console.error('Error al obtener la ubicación actual:', error);
+    } finally {
+      setLoading(false);
     }
-    let ubicacion = await Location.getCurrentPositionAsync({});
-    const coordenada = {
-      latitude: ubicacion.coords.latitude,
-      longitude: ubicacion.coords.longitude,
-    };
-    setUbicacionActual(coordenada);
-    setOrigen(coordenada);
-    actualizarRegionMapa(coordenada);
-    geocodificarInversoCoordenada(coordenada, setInputOrigen);
   }, [actualizarRegionMapa, geocodificarInversoCoordenada]);
 
   const decodificarPolilinea = useCallback((t) => {
@@ -247,20 +275,28 @@ export default function PantallaMapa({ navigation }) {
   }, []);
 
   const manejarCambioInput = useCallback(async (texto, esOrigen) => {
-    if (esOrigen) {
-      setInputOrigen(texto);
-      const coordenada = await geocodificarDireccion(texto);
-      if (coordenada) {
-        setOrigen(coordenada);
-        actualizarRegionMapa(coordenada);
+    setLoading(true);
+
+    try {
+      if (esOrigen) {
+        setInputOrigen(texto);
+        const coordenada = await geocodificarDireccion(texto);
+        if (coordenada) {
+          setOrigen(coordenada);
+          actualizarRegionMapa(coordenada);
+        }
+      } else {
+        setInputDestino(texto);
+        const coordenada = await geocodificarDireccion(texto);
+        if (coordenada) {
+          setDestino(coordenada);
+          actualizarRegionMapa(coordenada);
+        }
       }
-    } else {
-      setInputDestino(texto);
-      const coordenada = await geocodificarDireccion(texto);
-      if (coordenada) {
-        setDestino(coordenada);
-        actualizarRegionMapa(coordenada);
-      }
+    } catch (error) {
+      console.error('Error al manejar el cambio de input:', error);
+    } finally {
+      setLoading(false);
     }
   }, [actualizarRegionMapa, geocodificarDireccion]);
 
@@ -314,6 +350,7 @@ export default function PantallaMapa({ navigation }) {
   return (
     <View style={estilos.contenedor}>
       <MapView
+        ref={mapRef} // Referencia al MapView
         style={estilos.mapa}
         region={regionMapa}
         onRegionChangeComplete={setRegionMapa}
@@ -355,6 +392,16 @@ export default function PantallaMapa({ navigation }) {
               style={{ width: 40, height: 40 }}
             />
           </Marker>
+        ))}
+        {zonasPeligrosas.map((zona) => (
+          <Circle
+            key={`${zona.id}-circle`}
+            center={{ latitude: zona.latitude, longitude: zona.longitude }}
+            radius={zona.umbral}
+            strokeWidth={2}
+            strokeColor="rgba(255, 0, 0, 0.5)"
+            fillColor="rgba(255, 0, 0, 0.2)"
+          />
         ))}
       </MapView>
 
@@ -431,6 +478,12 @@ export default function PantallaMapa({ navigation }) {
           )}
         </View>
       </Modal>
+
+      {loading && (
+        <View style={estilos.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.text} />
+        </View>
+      )}
     </View>
   );
 }
@@ -523,5 +576,11 @@ const estilos = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
     textAlign: 'center',
+  },
+  loadingContainer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
