@@ -4,8 +4,11 @@ import MapView, { Marker, Polyline, Circle } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@react-navigation/native';
+import { GOOGLE_MAPS_APIKEY } from '@env';
 
-const GOOGLE_MAPS_APIKEY = 'AIzaSyBbrJUdLQRmOA2lXi0KYXy30Sm8HTk8WvY';
+// Luego puedes usar GOOGLE_MAPS_APIKEY en lugar de la clave dura en tu código
+
+
 const UMBRAL_PELIGRO_METROS = 100;
 
 export default function PantallaMapa({ navigation }) {
