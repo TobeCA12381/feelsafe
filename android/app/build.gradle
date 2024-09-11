@@ -109,13 +109,13 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.raterepositoryapp"
+    namespace 'com.anonymous.raterepositoryapp'
     defaultConfig {
-        applicationId "com.raterepositoryapp"
+        applicationId 'com.anonymous.raterepositoryapp'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "1.0"
+        versionName "1.0.0"
     }
     signingConfigs {
         debug {
@@ -193,7 +193,6 @@ dependencies {
     } else {
         implementation jscFlavor
     }
-    implementation project(':@react-native-community_checkbox')
 }
 
 if (rnVersion < versionToNumber(0, 75, 0)) {

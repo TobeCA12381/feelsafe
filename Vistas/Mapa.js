@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { StyleSheet, View, TextInput, Alert, TouchableOpacity, Text, Image, Modal, ActivityIndicator, ScrollView,DrawerLayoutAndroid, Share } from 'react-native';
+import { StyleSheet, View, TextInput, Alert, TouchableOpacity, Text, Image, Modal, ActivityIndicator, ScrollView, DrawerLayoutAndroid, Share, Platform } from 'react-native';
 import MapView, { Marker, Polyline, Circle } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,9 +7,12 @@ import { useTheme } from '@react-navigation/native';
 import { GOOGLE_MAPS_APIKEY } from '@env';
 import { calcularDistancia, decodificarPolilinea, obtenerIconoMarcador, geocodificarInversoCoordenada, geocodificarDireccion, colorearRuta } from '../utils/mapUtils';
 import { verificarSeguridadLogaritmica } from '../utils/routeSafety';
+import ViewShot from 'react-native-view-shot';
+import * as FileSystem from 'expo-file-system'; // Importamos expo-file-system para manejar archivos
+import * as MediaLibrary from 'expo-media-library';
+import * as Sharing from 'expo-sharing';
 
 const UMBRAL_PELIGRO_METROS = 100;
-const PRECISION_COORDENADAS = 0.0001; // Aproximadamente 11 metros de precisión
 
 export default function PantallaMapa({ navigation }) {
   const { colors } = useTheme();
@@ -38,12 +41,14 @@ export default function PantallaMapa({ navigation }) {
   const [modalPeligrosVisible, setModalPeligrosVisible] = useState(false);
   const [shareModalVisible, setShareModalVisible] = useState(false);
   const drawerRef = useRef(null);
-   // Agregar un console.log para verificar si se activa el modal
-   const abrirModalPeligros = () => {
+  // Agregar un console.log para verificar si se activa el modal
+  const abrirModalPeligros = () => {
     console.log('Nivel de seguridad clickeado, abriendo modal');
     setModalPeligrosVisible(true);
   };
 
+  const [compartirModalVisible, setCompartirModalVisible] = useState(false);
+  const mapShotRef = useRef(null);
 
   const zonasPeligrosas = useMemo(() => [
     { id: 1, latitude: -11.984, longitude: -77.007, descripcion: 'Zona peligrosa 1', tipo: 'ACOSO', umbral: UMBRAL_PELIGRO_METROS, peso: 30 },
@@ -86,7 +91,7 @@ export default function PantallaMapa({ navigation }) {
         ajustarVistaRuta(puntosDecodificados);
 
         const { puntosPeligrosos, puntuacion } = verificarSeguridadLogaritmica(puntosDecodificados, zonasPeligrosas);
-        
+
         setPuntuacionSeguridad(puntuacion);
         setSeguridadRuta(puntuacion < 50 ? 'peligroso' : puntuacion < 75 ? 'moderado' : 'seguro');
 
@@ -117,7 +122,7 @@ export default function PantallaMapa({ navigation }) {
       return acumulador;
     }, {});
   }, []);
-  
+
   const ajustarVistaRuta = useCallback((coordenadas) => {
     if (mapRef.current && coordenadas.length > 0) {
       mapRef.current.fitToCoordinates(coordenadas, {
@@ -132,7 +137,7 @@ export default function PantallaMapa({ navigation }) {
       drawerRef.current.openDrawer();
     }
   }, []);
-  
+
   const compartirRuta = useCallback(async () => {
     try {
       const result = await Share.share({
@@ -153,7 +158,7 @@ export default function PantallaMapa({ navigation }) {
       Alert.alert('Error', 'Ocurrió un error al compartir');
     }
   }, []);
-  
+
   const renderMenuLateral = () => (
     <View style={styles.drawer}>
       <Text style={styles.drawerTitle}>Menú</Text>
@@ -167,14 +172,97 @@ export default function PantallaMapa({ navigation }) {
     </View>
   );
 
-  
+
   useEffect(() => {
     if (origen && destino) {
       obtenerRuta();
     }
   }, [origen, destino, modoViaje, obtenerRuta]);
 
- 
+  const abrirModalCompartir = useCallback(() => {
+    setCompartirModalVisible(true);
+  }, []);
+
+  const compartirEnlaceApp = useCallback(async () => {
+    try {
+      await Share.share({
+        message: 'Descarga nuestra app de rutas seguras: [Enlace a tu app]',
+      });
+    } catch (error) {
+      Alert.alert('Error', 'Ocurrió un error al compartir el enlace de la app');
+    }
+  }, []);
+
+  const compartirEstadisticas = useCallback(async () => {
+    try {
+      await Share.share({
+        message: `Estadísticas de seguridad:\nNivel de seguridad: ${seguridadRuta}\nPuntuación: ${puntuacionSeguridad}`,
+      });
+    } catch (error) {
+      Alert.alert('Error', 'Ocurrió un error al compartir las estadísticas');
+    }
+  }, [seguridadRuta, puntuacionSeguridad]);
+  
+  const compartirScreenshot = useCallback(async () => {
+    if (mapShotRef.current) {
+      try {
+        console.log("Iniciando captura de screenshot...");
+        const uri = await mapShotRef.current.capture();
+        console.log("Screenshot capturado:", uri);
+  
+        const fileName = `ruta_segura_${Date.now()}.jpg`;
+        const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
+  
+        // Copiar el archivo al directorio de caché
+        await FileSystem.copyAsync({
+          from: uri,
+          to: fileUri
+        });
+  
+        console.log("Archivo copiado a:", fileUri);
+  
+        // Verificar si el archivo existe
+        const fileInfo = await FileSystem.getInfoAsync(fileUri);
+        if (!fileInfo.exists) {
+          console.error("El archivo no existe:", fileUri);
+          Alert.alert('Error', 'No se pudo generar el screenshot');
+          return;
+        }
+  
+        console.log("Iniciando compartir con URI:", fileUri);
+  
+        // Verificar si compartir está disponible
+        if (!(await Sharing.isAvailableAsync())) {
+          // Si compartir no está disponible, intentamos guardar en la galería
+          const { status } = await MediaLibrary.requestPermissionsAsync();
+          if (status === 'granted') {
+            await MediaLibrary.saveToLibraryAsync(fileUri);
+            Alert.alert('Éxito', 'La imagen se ha guardado en tu galería');
+          } else {
+            Alert.alert('Error', 'No se pudo guardar la imagen. Permisos denegados.');
+          }
+          return;
+        }
+  
+        // Compartir el archivo
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'image/jpeg',
+          dialogTitle: 'Compartir Ruta Segura',
+        });
+  
+        // Opcional: Eliminar el archivo temporal después de compartir
+        await FileSystem.deleteAsync(fileUri, { idempotent: true });
+  
+      } catch (error) {
+        console.error("Error detallado al capturar o compartir screenshot:", error);
+        Alert.alert('Error', 'No se pudo compartir el screenshot de la ruta: ' + error.message);
+      }
+    } else {
+      console.error("mapShotRef no está disponible");
+      Alert.alert('Error', 'No se pudo acceder a la referencia del mapa');
+    }
+  }, []);
+
   const obtenerUbicacionActual = useCallback(async () => {
     setLoading(true);
 
@@ -260,73 +348,74 @@ export default function PantallaMapa({ navigation }) {
       renderNavigationView={renderMenuLateral}
     >
       <View style={styles.contenedor}>
-        <MapView
-          ref={mapRef}
-          style={styles.mapa}
-          region={regionMapa}
-          onRegionChangeComplete={setRegionMapa}
-          onPress={manejarPresionMapa}
-        >
-          {origen && (
-            <Marker
-              coordinate={origen}
-              title="Origen"
-              draggable
-              onDragEnd={(e) => manejarFinArrastreMarcador(e.nativeEvent.coordinate, setOrigen, setInputOrigen)}
-            />
-          )}
-          {destino && (
-            <Marker
-              coordinate={destino}
-              title="Destino"
-              draggable
-              onDragEnd={(e) => manejarFinArrastreMarcador(e.nativeEvent.coordinate, setDestino, setInputDestino)}
-            />
-          )}
-          {colorearRuta(coordenadasRuta, zonasPeligrosas).map((segmento, index) => (
-            <Polyline
-              key={index}
-              coordinates={segmento.coordenadas}
-              strokeColor={segmento.color}
-              strokeWidth={3}
-            />
-          ))}
-          {zonasPeligrosas.map((zona) => (
-            <Marker
-              key={zona.id}
-              coordinate={{ latitude: zona.latitude, longitude: zona.longitude }}
-              title={zona.descripcion}
-              onPress={() => manejarPresionMarcador(zona)}
-            >
-              <Image
-                source={obtenerIconoMarcador(zona.tipo)}
-                style={{ width: 40, height: 40 }}
+      <ViewShot ref={mapShotRef} options={{ format: "jpg", quality: 0.8, result: "tmpfile" }} style={StyleSheet.absoluteFillObject}>
+          <MapView
+            ref={mapRef}
+            style={styles.mapa}
+            region={regionMapa}
+            onRegionChangeComplete={setRegionMapa}
+            onPress={manejarPresionMapa}
+          >
+            {origen && (
+              <Marker
+                coordinate={origen}
+                title="Origen"
+                draggable
+                onDragEnd={(e) => manejarFinArrastreMarcador(e.nativeEvent.coordinate, setOrigen, setInputOrigen)}
               />
-            </Marker>
-          ))}
-          {zonasPeligrosas.map((zona) => (
-            <Circle
-              key={`${zona.id}-circle`}
-              center={{ latitude: zona.latitude, longitude: zona.longitude }}
-              radius={zona.umbral}
-              strokeWidth={2}
-              strokeColor="rgba(255, 0, 0, 0.5)"
-              fillColor="rgba(255, 0, 0, 0.2)"
-            />
-          ))}
-        </MapView>
-  
-        {/* Indicador de seguridad interactivo */}
-        <TouchableOpacity
-          style={[styles.indicadorSeguridad, { backgroundColor: seguridadRuta === 'peligroso' ? '#FFCCCC' : seguridadRuta === 'moderado' ? '#FFF5CC' : '#CCFFCC', borderWidth: 1, borderColor: 'blue' }]}
-          onPress={abrirModalPeligros}
-        >
-          <Text style={{ color: seguridadRuta === 'peligroso' ? '#FF0000' : seguridadRuta === 'moderado' ? '#FFA500' : '#00FF00', fontSize: 16, fontWeight: 'bold' }}>
-            Nivel de seguridad: {seguridadRuta}
-          </Text>
-          <Text style={{ fontSize: 14 }}>Puntuación de seguridad: {puntuacionSeguridad}</Text>
-        </TouchableOpacity>
-  
+            )}
+            {destino && (
+              <Marker
+                coordinate={destino}
+                title="Destino"
+                draggable
+                onDragEnd={(e) => manejarFinArrastreMarcador(e.nativeEvent.coordinate, setDestino, setInputDestino)}
+              />
+            )}
+            {colorearRuta(coordenadasRuta, zonasPeligrosas).map((segmento, index) => (
+              <Polyline
+                key={index}
+                coordinates={segmento.coordenadas}
+                strokeColor={segmento.color}
+                strokeWidth={3}
+              />
+            ))}
+            {zonasPeligrosas.map((zona) => (
+              <Marker
+                key={zona.id}
+                coordinate={{ latitude: zona.latitude, longitude: zona.longitude }}
+                title={zona.descripcion}
+                onPress={() => manejarPresionMarcador(zona)}
+              >
+                <Image
+                  source={obtenerIconoMarcador(zona.tipo)}
+                  style={{ width: 40, height: 40 }}
+                />
+              </Marker>
+            ))}
+            {zonasPeligrosas.map((zona) => (
+              <Circle
+                key={`${zona.id}-circle`}
+                center={{ latitude: zona.latitude, longitude: zona.longitude }}
+                radius={zona.umbral}
+                strokeWidth={2}
+                strokeColor="rgba(255, 0, 0, 0.5)"
+                fillColor="rgba(255, 0, 0, 0.2)"
+              />
+            ))}
+          </MapView>
+
+          {/* Indicador de seguridad interactivo */}
+          <TouchableOpacity
+            style={[styles.indicadorSeguridad, { backgroundColor: seguridadRuta === 'peligroso' ? '#FFCCCC' : seguridadRuta === 'moderado' ? '#FFF5CC' : '#CCFFCC', borderWidth: 1, borderColor: 'blue' }]}
+            onPress={abrirModalPeligros}
+          >
+            <Text style={{ color: seguridadRuta === 'peligroso' ? '#FF0000' : seguridadRuta === 'moderado' ? '#FFA500' : '#00FF00', fontSize: 16, fontWeight: 'bold' }}>
+              Nivel de seguridad: {seguridadRuta}
+            </Text>
+            <Text style={{ fontSize: 14 }}>Puntuación de seguridad: {puntuacionSeguridad}</Text>
+          </TouchableOpacity>
+        </ViewShot>
         <Modal
           animationType="slide"
           transparent={true}
@@ -354,17 +443,43 @@ export default function PantallaMapa({ navigation }) {
             </TouchableOpacity>
           </View>
         </Modal>
-  
+
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={compartirModalVisible}
+          onRequestClose={() => setCompartirModalVisible(false)}
+        >
+          <View style={styles.modalView}>
+            <Text style={styles.modalTitle}>Compartir</Text>
+            <TouchableOpacity style={styles.modalOption} onPress={compartirEnlaceApp}>
+              <Text>Compartir enlace de la app</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.modalOption} onPress={compartirEstadisticas}>
+              <Text>Compartir estadísticas de seguridad</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.modalOption} onPress={compartirScreenshot}>
+              <Text>Compartir screenshot de la ruta</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setCompartirModalVisible(false)}
+            >
+              <Text style={styles.textStyle}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </Modal>
+
         {/* Botón flotante del menú lateral */}
         <TouchableOpacity style={styles.botonMenu} onPress={abrirMenuLateral}>
           <Ionicons name="menu" size={30} color="#FFF" />
         </TouchableOpacity>
-  
+
         {/* Botón flotante de compartir */}
-        <TouchableOpacity style={styles.botonShare} onPress={compartirRuta}>
+        <TouchableOpacity style={styles.botonShare} onPress={abrirModalCompartir}>
           <Ionicons name="share-social-outline" size={30} color="#FFF" />
         </TouchableOpacity>
-  
+
         {/* Botón flotante para el GPS */}
         <TouchableOpacity
           style={styles.botonGPS}
@@ -372,7 +487,7 @@ export default function PantallaMapa({ navigation }) {
         >
           <Ionicons name="navigate" size={30} color="#FFF" />
         </TouchableOpacity>
-  
+
         <View style={styles.contenedorInput}>
           <TextInput
             style={styles.input}
@@ -389,7 +504,7 @@ export default function PantallaMapa({ navigation }) {
             onFocus={() => setSeleccionandoOrigen(false)}
           />
         </View>
-  
+
       </View>
     </DrawerLayoutAndroid>
   );
@@ -397,6 +512,40 @@ export default function PantallaMapa({ navigation }) {
 
 
 const styles = StyleSheet.create({
+  modalView: {
+    margin: 20,
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 35,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5
+  },
+  modalTitle: {
+    marginBottom: 15,
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  modalOption: {
+    backgroundColor: '#F0F0F0',
+    padding: 10,
+    borderRadius: 10,
+    width: '100%',
+    marginBottom: 10,
+    alignItems: 'center',
+  },
+  textStyle: {
+    color: 'white',
+    fontWeight: 'bold',
+    textAlign: 'center'
+  },
   drawer: {
     flex: 1,
     backgroundColor: '#fff',
@@ -458,7 +607,7 @@ const styles = StyleSheet.create({
   },
   mapa: {
     width: '100%',
-    height: '60%',  // Ajustamos el tamaño para permitir más espacio a los inputs
+    height: '77%',  // Ajustamos el tamaño para permitir más espacio a los inputs
   },
   botonMenu: {
     position: 'absolute',
@@ -521,7 +670,7 @@ const styles = StyleSheet.create({
     padding: 15,
     alignItems: 'center',
     position: 'absolute',
-    bottom: 265,
+    bottom: 70,
     left: '5%',
     right: '5%',
     borderRadius: 15,
