@@ -343,6 +343,7 @@ export default function PantallaMapa({ navigation }) {
 
 
   return (
+    <ViewShot ref={mapShotRef} options={{ format: "jpg", quality: 0.8, result: "tmpfile" }} style={StyleSheet.absoluteFillObject}>
     <DrawerLayoutAndroid
       ref={drawerRef}
       drawerWidth={300}
@@ -350,7 +351,7 @@ export default function PantallaMapa({ navigation }) {
       renderNavigationView={renderMenuLateral}
     >
       <View style={styles.contenedor}>
-        <ViewShot ref={mapShotRef} options={{ format: "jpg", quality: 0.8, result: "tmpfile" }} style={StyleSheet.absoluteFillObject}>
+       
           <MapView
             ref={mapRef}
             style={styles.mapa}
@@ -407,7 +408,9 @@ export default function PantallaMapa({ navigation }) {
             ))}
           </MapView>
 
-        </ViewShot>
+
+
+      
 
         {/* Coloca el indicador de seguridad fuera del MapView */}
         <TouchableOpacity
@@ -507,9 +510,11 @@ export default function PantallaMapa({ navigation }) {
             onFocus={() => setSeleccionandoOrigen(false)}
           />
         </View>
-
+        
       </View>
+      
     </DrawerLayoutAndroid>
+    </ViewShot>
   );
 }
 
@@ -720,3 +725,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
+
