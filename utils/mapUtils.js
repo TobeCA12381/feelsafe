@@ -57,18 +57,21 @@ export const calcularDistancia = (punto1, punto2) => {
   
   export const geocodificarInversoCoordenada = async (coordenada, setInput) => {
     try {
-      const respuesta = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${coordenada.latitude},${coordenada.longitude}&key=${process.env.GOOGLE_MAPS_APIKEY}`
-      );
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${coordenada.latitude},${coordenada.longitude}&key=${GOOGLE_MAPS_APIKEY}`;
+      const respuesta = await fetch(url);
       const datos = await respuesta.json();
-      if (datos.results.length > 0) {
-        const direccion = datos.results[0].formatted_address;
-        setInput(direccion);
+  
+      if (datos.status === 'OK' && datos.results.length > 0) {
+        setInput(datos.results[0].formatted_address);
       } else {
-        Alert.alert('Error', 'No se pudo encontrar la dirección');
+        console.error('No se encontraron resultados para la geocodificación inversa');
+        // Usar Alert aquí
+        Alert.alert('Error', 'No se pudo obtener la dirección para las coordenadas dadas');
       }
     } catch (error) {
       console.error('Error en la geocodificación inversa:', error);
+      // Usar Alert aquí
+      Alert.alert('Error', 'Ocurrió un error al obtener la dirección');
     }
   };
   
