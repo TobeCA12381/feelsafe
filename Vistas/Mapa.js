@@ -11,7 +11,12 @@ import ViewShot from 'react-native-view-shot';
 import * as FileSystem from 'expo-file-system'; // Importamos expo-file-system para manejar archivos
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
+import { Dimensions } from 'react-native';
+import { SafeAreaView } from 'react-native';
+import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 
+// Obtiene las dimensiones de la pantalla
+const { width, height } = Dimensions.get('window');
 const UMBRAL_PELIGRO_METROS = 100;
 
 export default function PantallaMapa({ navigation }) {
@@ -42,6 +47,7 @@ export default function PantallaMapa({ navigation }) {
   const [shareModalVisible, setShareModalVisible] = useState(false);
   const drawerRef = useRef(null);
 
+  const { width, height } = Dimensions.get('window');
 
   // Función para abrir el modal
   const abrirModalPeligros = useCallback(() => {
@@ -343,266 +349,256 @@ export default function PantallaMapa({ navigation }) {
 
 
   return (
-    <ViewShot ref={mapShotRef} options={{ format: "jpg", quality: 0.8, result: "tmpfile" }} style={StyleSheet.absoluteFillObject}>
-    <DrawerLayoutAndroid
-      ref={drawerRef}
-      drawerWidth={300}
-      drawerPosition="left"
-      renderNavigationView={renderMenuLateral}
-    >
-      <View style={styles.contenedor}>
-       
-          <MapView
-            ref={mapRef}
-            style={styles.mapa}
-            region={regionMapa}
-            onRegionChangeComplete={setRegionMapa}
-            onPress={manejarPresionMapa}
-          >
-            {origen && (
-              <Marker
-                coordinate={origen}
-                title="Origen"
-                draggable
-                onDragEnd={(e) => manejarFinArrastreMarcador(e.nativeEvent.coordinate, setOrigen, setInputOrigen)}
-              />
-            )}
-            {destino && (
-              <Marker
-                coordinate={destino}
-                title="Destino"
-                draggable
-                onDragEnd={(e) => manejarFinArrastreMarcador(e.nativeEvent.coordinate, setDestino, setInputDestino)}
-              />
-            )}
-            {colorearRuta(coordenadasRuta, zonasPeligrosas).map((segmento, index) => (
-              <Polyline
-                key={index}
-                coordinates={segmento.coordenadas}
-                strokeColor={segmento.color}
-                strokeWidth={3}
-              />
-            ))}
-            {zonasPeligrosas.map((zona) => (
-              <Marker
-                key={zona.id}
-                coordinate={{ latitude: zona.latitude, longitude: zona.longitude }}
-                title={zona.descripcion}
-                onPress={() => manejarPresionMarcador(zona)}
-              >
-                <Image
-                  source={obtenerIconoMarcador(zona.tipo)}
-                  style={{ width: 40, height: 40 }}
-                />
-              </Marker>
-            ))}
-            {zonasPeligrosas.map((zona) => (
-              <Circle
-                key={`${zona.id}-circle`}
-                center={{ latitude: zona.latitude, longitude: zona.longitude }}
-                radius={zona.umbral}
-                strokeWidth={2}
-                strokeColor="rgba(255, 0, 0, 0.5)"
-                fillColor="rgba(255, 0, 0, 0.2)"
-              />
-            ))}
-          </MapView>
-
-
-
-      
-
-        {/* Coloca el indicador de seguridad fuera del MapView */}
-        <TouchableOpacity
-          style={[styles.indicadorSeguridad, { backgroundColor: seguridadRuta === 'peligroso' ? '#FFCCCC' : seguridadRuta === 'moderado' ? '#FFF5CC' : '#CCFFCC', borderWidth: 1, borderColor: 'blue', position: 'absolute', bottom: 245, left: '5%', right: '5%', zIndex: 10 }]}
-          onPress={abrirModalPeligros}
-        >
-          <Text style={{ color: seguridadRuta === 'peligroso' ? '#FF0000' : seguridadRuta === 'moderado' ? '#FFA500' : '#00FF00', fontSize: 16, fontWeight: 'bold' }}>
-            Nivel de seguridad: {seguridadRuta}
-          </Text>
-          <Text style={{ fontSize: 14 }}>Puntuación de seguridad: {puntuacionSeguridad}</Text>
-        </TouchableOpacity>
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={modalPeligrosVisible}
-          onRequestClose={() => setModalPeligrosVisible(false)}
-        >
-          <View style={styles.vistaModal}>
-            <Text style={styles.textoModal}>Zonas peligrosas detectadas: {zonasPeligrosasEncontradas.length}</Text>
-            <ScrollView>
-              {zonasPeligrosasEncontradas.length > 0 ? (
-                Object.entries(agruparZonasPorTipo(zonasPeligrosasEncontradas)).map(([tipo, count], index) => (
-                  <Text key={index}>
-                    • Tipo: {tipo} (Cantidad: {count})
-                  </Text>
-                ))
-              ) : (
-                <Text>No hay zonas peligrosas cercanas.</Text>
-              )}
-            </ScrollView>
-            <TouchableOpacity
-              style={styles.botonCerrar}
-              onPress={() => setModalPeligrosVisible(false)}
-            >
-              <Text style={styles.textoBotonCerrar}>Cerrar</Text>
-            </TouchableOpacity>
-          </View>
-        </Modal>
-
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={compartirModalVisible}
-          onRequestClose={() => setCompartirModalVisible(false)}
-        >
-          <View style={styles.modalView}>
-            <Text style={styles.modalTitle}>Compartir</Text>
-            <TouchableOpacity style={styles.modalOption} onPress={compartirEnlaceApp}>
-              <Text>Compartir enlace de la app</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.modalOption} onPress={compartirEstadisticas}>
-              <Text>Compartir estadísticas de seguridad</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.modalOption} onPress={compartirScreenshot}>
-              <Text>Compartir screenshot de la ruta</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setCompartirModalVisible(false)}
-            >
-              <Text style={styles.textStyle}>Cerrar</Text>
-            </TouchableOpacity>
-          </View>
-        </Modal>
-
-        {/* Botón flotante del menú lateral */}
-        <TouchableOpacity style={styles.botonMenu} onPress={abrirMenuLateral}>
-          <Ionicons name="menu" size={30} color="#FFF" />
-        </TouchableOpacity>
-
-        {/* Botón flotante de compartir */}
-        <TouchableOpacity style={styles.botonShare} onPress={abrirModalCompartir}>
-          <Ionicons name="share-social-outline" size={30} color="#FFF" />
-        </TouchableOpacity>
-
-        {/* Botón flotante para el GPS */}
-        <TouchableOpacity
-          style={styles.botonGPS}
-          onPress={obtenerUbicacionActual}
-        >
-          <Ionicons name="navigate" size={30} color="#FFF" />
-        </TouchableOpacity>
-
-        <View style={styles.contenedorInput}>
-          <TextInput
-            style={styles.input}
-            placeholder="¿Dónde estamos?"
-            value={inputOrigen}
-            onChangeText={(texto) => manejarCambioInput(texto, true)}
-            onFocus={() => setSeleccionandoOrigen(true)}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="¿Adónde vamos?"
-            value={inputDestino}
-            onChangeText={(texto) => manejarCambioInput(texto, false)}
-            onFocus={() => setSeleccionandoOrigen(false)}
-          />
-        </View>
+    <SafeAreaView style={{ flex: 1 }}>
+      <ViewShot ref={mapShotRef} options={{ format: "jpg", quality: 0.8, result: "tmpfile" }} style={StyleSheet.absoluteFillObject}>
+      <DrawerLayoutAndroid
+        ref={drawerRef}
+        drawerWidth={wp('80%')}
+        drawerPosition="left"
+        renderNavigationView={renderMenuLateral}
+      >
         
-      </View>
-      
-    </DrawerLayoutAndroid>
-    </ViewShot>
+        <View style={styles.contenedor}>
+           <MapView
+              ref={mapRef}
+              style={styles.mapa}
+              region={regionMapa}
+              onRegionChangeComplete={setRegionMapa}
+              onPress={manejarPresionMapa}
+            >
+              {origen && (
+                <Marker
+                  coordinate={origen}
+                  title="Origen"
+                  draggable
+                  onDragEnd={(e) => manejarFinArrastreMarcador(e.nativeEvent.coordinate, setOrigen, setInputOrigen)}
+                />
+              )}
+              {destino && (
+                <Marker
+                  coordinate={destino}
+                  title="Destino"
+                  draggable
+                  onDragEnd={(e) => manejarFinArrastreMarcador(e.nativeEvent.coordinate, setDestino, setInputDestino)}
+                />
+              )}
+              {colorearRuta(coordenadasRuta, zonasPeligrosas).map((segmento, index) => (
+                <Polyline
+                  key={index}
+                  coordinates={segmento.coordenadas}
+                  strokeColor={segmento.color}
+                  strokeWidth={3}
+                />
+              ))}
+              {zonasPeligrosas.map((zona) => (
+                <Marker
+                  key={zona.id}
+                  coordinate={{ latitude: zona.latitude, longitude: zona.longitude }}
+                  title={zona.descripcion}
+                  onPress={() => manejarPresionMarcador(zona)}
+                >
+                  <Image
+                    source={obtenerIconoMarcador(zona.tipo)}
+                    style={{ width: 40, height: 40 }}
+                  />
+                </Marker>
+              ))}
+              {zonasPeligrosas.map((zona) => (
+                <Circle
+                  key={`${zona.id}-circle`}
+                  center={{ latitude: zona.latitude, longitude: zona.longitude }}
+                  radius={zona.umbral}
+                  strokeWidth={2}
+                  strokeColor="rgba(255, 0, 0, 0.5)"
+                  fillColor="rgba(255, 0, 0, 0.2)"
+                />
+              ))}
+            </MapView>
+
+
+            {/* Coloca el indicador de seguridad fuera del MapView */}
+            <TouchableOpacity
+              style={[styles.indicadorSeguridad, { backgroundColor: seguridadRuta === 'peligroso' ? '#FFCCCC' : seguridadRuta === 'moderado' ? '#FFF5CC' : '#CCFFCC', borderWidth: 1, borderColor: 'blue', position: 'absolute', bottom: 270, left: '5%', right: '5%', zIndex: 10 }]}
+              onPress={abrirModalPeligros}
+            >
+              <Text style={{ color: seguridadRuta === 'peligroso' ? '#FF0000' : seguridadRuta === 'moderado' ? '#FFA500' : '#00FF00', fontSize: 16, fontWeight: 'bold' }}>
+                Nivel de seguridad: {seguridadRuta}
+              </Text>
+              <Text style={{ fontSize: 14 }}>Puntuación de seguridad: {puntuacionSeguridad}</Text>
+            </TouchableOpacity>
+            <Modal
+              animationType="slide"
+              transparent={true}
+              visible={modalPeligrosVisible}
+              onRequestClose={() => setModalPeligrosVisible(false)}
+            >
+              <View style={styles.vistaModal}>
+                <Text style={styles.textoModal}>Zonas peligrosas detectadas: {zonasPeligrosasEncontradas.length}</Text>
+                <ScrollView>
+                  {zonasPeligrosasEncontradas.length > 0 ? (
+                    Object.entries(agruparZonasPorTipo(zonasPeligrosasEncontradas)).map(([tipo, count], index) => (
+                      <Text key={index}>
+                        • Tipo: {tipo} (Cantidad: {count})
+                      </Text>
+                    ))
+                  ) : (
+                    <Text>No hay zonas peligrosas cercanas.</Text>
+                  )}
+                </ScrollView>
+                <TouchableOpacity
+                  style={styles.botonCerrar}
+                  onPress={() => setModalPeligrosVisible(false)}
+                >
+                  <Text style={styles.textoBotonCerrar}>Cerrar</Text>
+                </TouchableOpacity>
+              </View>
+            </Modal>
+
+            <Modal
+              animationType="slide"
+              transparent={true}
+              visible={compartirModalVisible}
+              onRequestClose={() => setCompartirModalVisible(false)}
+            >
+              <View style={styles.modalView}>
+                <Text style={styles.modalTitle}>Compartir</Text>
+                <TouchableOpacity style={styles.modalOption} onPress={compartirEnlaceApp}>
+                  <Text>Compartir enlace de la app</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.modalOption} onPress={compartirEstadisticas}>
+                  <Text>Compartir estadísticas de seguridad</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.modalOption} onPress={compartirScreenshot}>
+                  <Text>Compartir screenshot de la ruta</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={() => setCompartirModalVisible(false)}
+                >
+                  <Text style={styles.textStyle}>Cerrar</Text>
+                </TouchableOpacity>
+              </View>
+            </Modal>
+
+            {/* Botón flotante del menú lateral */}
+            <TouchableOpacity style={styles.botonMenu} onPress={abrirMenuLateral}>
+              <Ionicons name="menu" size={30} color="#FFF" />
+            </TouchableOpacity>
+
+            {/* Botón flotante de compartir */}
+            <TouchableOpacity style={styles.botonShare} onPress={abrirModalCompartir}>
+              <Ionicons name="share-social-outline" size={30} color="#FFF" />
+            </TouchableOpacity>
+
+            {/* Botón flotante para el GPS */}
+            <TouchableOpacity
+              style={styles.botonGPS}
+              onPress={obtenerUbicacionActual}
+            >
+              <Ionicons name="navigate" size={30} color="#FFF" />
+            </TouchableOpacity>
+
+            <View style={styles.contenedorInput}>
+              <TextInput
+                style={styles.input}
+                placeholder="¿Dónde estamos?"
+                value={inputOrigen}
+                onChangeText={(texto) => manejarCambioInput(texto, true)}
+                onFocus={() => setSeleccionandoOrigen(true)}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="¿Adónde vamos?"
+                value={inputDestino}
+                onChangeText={(texto) => manejarCambioInput(texto, false)}
+                onFocus={() => setSeleccionandoOrigen(false)}
+              />
+            </View>
+            
+        </View>
+      </DrawerLayoutAndroid >
+      </ViewShot>
+    </SafeAreaView >
   );
 }
 
 
 const styles = StyleSheet.create({
   modalView: {
-    margin: 20,
+    margin: wp('5%'),
     backgroundColor: 'white',
     borderRadius: 20,
-    padding: 35,
+    padding: wp('5%'),
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2
+      height: 2,
     },
     shadowOpacity: 0.25,
     shadowRadius: 4,
-    elevation: 5
+    elevation: 5,
   },
   modalTitle: {
-    marginBottom: 15,
+    marginBottom: hp('2%'),
     textAlign: 'center',
-    fontSize: 18,
+    fontSize: wp('5%'),
     fontWeight: 'bold',
   },
   modalOption: {
     backgroundColor: '#F0F0F0',
-    padding: 10,
+    padding: wp('4%'),
     borderRadius: 10,
     width: '100%',
-    marginBottom: 10,
+    marginBottom: hp('2%'),
     alignItems: 'center',
   },
   textStyle: {
     color: 'white',
     fontWeight: 'bold',
-    textAlign: 'center'
+    textAlign: 'center',
   },
   drawer: {
     flex: 1,
     backgroundColor: '#fff',
-    padding: 20,
+    padding: wp('5%'),
   },
   drawerTitle: {
-    fontSize: 20,
+    fontSize: wp('6%'),
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: hp('3%'),
   },
   drawerItem: {
-    padding: 10,
+    padding: wp('4%'),
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
   },
   shareModalView: {
-    margin: 20,
+    margin: wp('5%'),
     backgroundColor: 'white',
     borderRadius: 20,
-    padding: 35,
+    padding: wp('5%'),
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2
+      height: 2,
     },
     shadowOpacity: 0.25,
     shadowRadius: 4,
-    elevation: 5
+    elevation: 5,
   },
   shareModalTitle: {
-    fontSize: 20,
+    fontSize: wp('6%'),
     fontWeight: 'bold',
-    marginBottom: 15,
-  },
-  shareOptions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
-  },
-  shareOption: {
-    alignItems: 'center',
+    marginBottom: hp('2%'),
   },
   closeButton: {
     backgroundColor: '#2196F3',
     borderRadius: 20,
-    padding: 10,
+    padding: wp('3%'),
     elevation: 2,
-    marginTop: 15,
+    marginTop: hp('2%'),
   },
   closeButtonText: {
     color: 'white',
@@ -614,49 +610,43 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F8F8',
   },
   mapa: {
-    width: '100%',
-    height: '63%',  // Ajustamos el tamaño para permitir más espacio a los inputs
+    width: wp('100%'), // Ancho ajustado al 100% de la pantalla
+    height: hp('58%'), // Altura ajustada al 60% de la pantalla
   },
   botonMenu: {
     position: 'absolute',
-    top: 50,
-    left: 20,
-    zIndex: 1,
+    top: hp('5%'),
+    left: wp('5%'),
     backgroundColor: '#333',
-    padding: 10,
+    padding: wp('3%'),
     borderRadius: 25,
   },
   botonShare: {
     position: 'absolute',
-    top: 50,
-    right: 20,
-    zIndex: 1,
+    top: hp('5%'),
+    right: wp('5%'),
     backgroundColor: '#333',
-    padding: 10,
+    padding: wp('3%'),
     borderRadius: 25,
   },
   botonGPS: {
     position: 'absolute',
-    top: 500,
-    right: 20,
+    top: hp('51%'), // Usamos porcentaje relativo
+    right: wp('5%'),
     zIndex: 1,
     backgroundColor: '#333',
-    padding: 10,
+    padding: wp('3%'),
     borderRadius: 25,
   },
-  imagenAlerta: {
-    width: 40,
-    height: 40,
-  },
   contenedorInput: {
-    padding: 10,
+    padding: wp('5%'),
     backgroundColor: 'white',
     position: 'absolute',
     bottom: 0,
     width: '100%',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    shadowColor: '#000',  // Sombra para la caja de input
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 2,
@@ -666,16 +656,16 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   input: {
-    height: 70,  // Incrementar el tamaño para hacerlo más accesible
+    height: hp('8%'), // Tamaño accesible en diferentes pantallas
     borderColor: '#ddd',
     borderWidth: 1,
-    marginBottom: 45,
-    paddingHorizontal: 15,
-    borderRadius: 10,  // Bordes redondeados para un estilo moderno
-    fontSize: 16,  // Texto más grande
+    marginBottom: hp('5%'),
+    paddingHorizontal: wp('3%'),
+    borderRadius: 10,
+    fontSize: wp('4.5%'), // Texto más grande
   },
   indicadorSeguridad: {
-    padding: 15,
+    padding: wp('3%'),
     alignItems: 'center',
     position: 'absolute',
     left: '5%',
@@ -688,17 +678,16 @@ const styles = StyleSheet.create({
     elevation: 5,
     zIndex: 10, // Asegura que esté por encima del mapa y otros elementos
   },
-  
   textoIndicador: {
-    color: '#333',  // Color más oscuro para el texto
-    fontSize: 16,
+    color: '#333',
+    fontSize: wp('4%'), // Texto adaptado al tamaño de pantalla
     fontWeight: 'bold',
   },
   vistaModal: {
-    margin: 20,
+    margin: wp('5%'),
     backgroundColor: 'white',
     borderRadius: 20,
-    padding: 35,
+    padding: wp('5%'),
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -709,20 +698,13 @@ const styles = StyleSheet.create({
   botonCerrar: {
     backgroundColor: '#2196F3',
     borderRadius: 20,
-    padding: 10,
+    padding: wp('3%'),
     elevation: 2,
-    marginTop: 15,
+    marginTop: hp('2%'),
   },
   textoBotonCerrar: {
     color: 'white',
     fontWeight: 'bold',
     textAlign: 'center',
   },
-  loadingContainer: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
 });
-
