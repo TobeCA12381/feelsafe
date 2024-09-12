@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { StyleSheet, View, TextInput, Alert, TouchableOpacity, Text, Image, Modal, ActivityIndicator, ScrollView, DrawerLayoutAndroid, Share, Platform } from 'react-native';
+import { StyleSheet, View, TextInput, TouchableOpacity, Text, Image, Modal, ActivityIndicator, ScrollView, DrawerLayoutAndroid, Share, Platform, Alert } from 'react-native';
 import MapView, { Marker, Polyline, Circle } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
@@ -41,11 +41,13 @@ export default function PantallaMapa({ navigation }) {
   const [modalPeligrosVisible, setModalPeligrosVisible] = useState(false);
   const [shareModalVisible, setShareModalVisible] = useState(false);
   const drawerRef = useRef(null);
-  // Agregar un console.log para verificar si se activa el modal
-  const abrirModalPeligros = () => {
-    console.log('Nivel de seguridad clickeado, abriendo modal');
+
+
+  // Función para abrir el modal
+  const abrirModalPeligros = useCallback(() => {
+    console.log('Abriendo modal de peligros');
     setModalPeligrosVisible(true);
-  };
+  }, []);
 
   const [compartirModalVisible, setCompartirModalVisible] = useState(false);
   const mapShotRef = useRef(null);
@@ -202,25 +204,25 @@ export default function PantallaMapa({ navigation }) {
       Alert.alert('Error', 'Ocurrió un error al compartir las estadísticas');
     }
   }, [seguridadRuta, puntuacionSeguridad]);
-  
+
   const compartirScreenshot = useCallback(async () => {
     if (mapShotRef.current) {
       try {
         console.log("Iniciando captura de screenshot...");
         const uri = await mapShotRef.current.capture();
         console.log("Screenshot capturado:", uri);
-  
+
         const fileName = `ruta_segura_${Date.now()}.jpg`;
         const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
-  
+
         // Copiar el archivo al directorio de caché
         await FileSystem.copyAsync({
           from: uri,
           to: fileUri
         });
-  
+
         console.log("Archivo copiado a:", fileUri);
-  
+
         // Verificar si el archivo existe
         const fileInfo = await FileSystem.getInfoAsync(fileUri);
         if (!fileInfo.exists) {
@@ -228,9 +230,9 @@ export default function PantallaMapa({ navigation }) {
           Alert.alert('Error', 'No se pudo generar el screenshot');
           return;
         }
-  
+
         console.log("Iniciando compartir con URI:", fileUri);
-  
+
         // Verificar si compartir está disponible
         if (!(await Sharing.isAvailableAsync())) {
           // Si compartir no está disponible, intentamos guardar en la galería
@@ -243,16 +245,16 @@ export default function PantallaMapa({ navigation }) {
           }
           return;
         }
-  
+
         // Compartir el archivo
         await Sharing.shareAsync(fileUri, {
           mimeType: 'image/jpeg',
           dialogTitle: 'Compartir Ruta Segura',
         });
-  
+
         // Opcional: Eliminar el archivo temporal después de compartir
         await FileSystem.deleteAsync(fileUri, { idempotent: true });
-  
+
       } catch (error) {
         console.error("Error detallado al capturar o compartir screenshot:", error);
         Alert.alert('Error', 'No se pudo compartir el screenshot de la ruta: ' + error.message);
@@ -348,7 +350,7 @@ export default function PantallaMapa({ navigation }) {
       renderNavigationView={renderMenuLateral}
     >
       <View style={styles.contenedor}>
-      <ViewShot ref={mapShotRef} options={{ format: "jpg", quality: 0.8, result: "tmpfile" }} style={StyleSheet.absoluteFillObject}>
+        <ViewShot ref={mapShotRef} options={{ format: "jpg", quality: 0.8, result: "tmpfile" }} style={StyleSheet.absoluteFillObject}>
           <MapView
             ref={mapRef}
             style={styles.mapa}
@@ -405,17 +407,18 @@ export default function PantallaMapa({ navigation }) {
             ))}
           </MapView>
 
-          {/* Indicador de seguridad interactivo */}
-          <TouchableOpacity
-            style={[styles.indicadorSeguridad, { backgroundColor: seguridadRuta === 'peligroso' ? '#FFCCCC' : seguridadRuta === 'moderado' ? '#FFF5CC' : '#CCFFCC', borderWidth: 1, borderColor: 'blue' }]}
-            onPress={abrirModalPeligros}
-          >
-            <Text style={{ color: seguridadRuta === 'peligroso' ? '#FF0000' : seguridadRuta === 'moderado' ? '#FFA500' : '#00FF00', fontSize: 16, fontWeight: 'bold' }}>
-              Nivel de seguridad: {seguridadRuta}
-            </Text>
-            <Text style={{ fontSize: 14 }}>Puntuación de seguridad: {puntuacionSeguridad}</Text>
-          </TouchableOpacity>
         </ViewShot>
+
+        {/* Coloca el indicador de seguridad fuera del MapView */}
+        <TouchableOpacity
+          style={[styles.indicadorSeguridad, { backgroundColor: seguridadRuta === 'peligroso' ? '#FFCCCC' : seguridadRuta === 'moderado' ? '#FFF5CC' : '#CCFFCC', borderWidth: 1, borderColor: 'blue', position: 'absolute', bottom: 245, left: '5%', right: '5%', zIndex: 10 }]}
+          onPress={abrirModalPeligros}
+        >
+          <Text style={{ color: seguridadRuta === 'peligroso' ? '#FF0000' : seguridadRuta === 'moderado' ? '#FFA500' : '#00FF00', fontSize: 16, fontWeight: 'bold' }}>
+            Nivel de seguridad: {seguridadRuta}
+          </Text>
+          <Text style={{ fontSize: 14 }}>Puntuación de seguridad: {puntuacionSeguridad}</Text>
+        </TouchableOpacity>
         <Modal
           animationType="slide"
           transparent={true}
@@ -607,7 +610,7 @@ const styles = StyleSheet.create({
   },
   mapa: {
     width: '100%',
-    height: '77%',  // Ajustamos el tamaño para permitir más espacio a los inputs
+    height: '63%',  // Ajustamos el tamaño para permitir más espacio a los inputs
   },
   botonMenu: {
     position: 'absolute',
@@ -629,7 +632,7 @@ const styles = StyleSheet.create({
   },
   botonGPS: {
     position: 'absolute',
-    top: 450,
+    top: 500,
     right: 20,
     zIndex: 1,
     backgroundColor: '#333',
@@ -670,7 +673,6 @@ const styles = StyleSheet.create({
     padding: 15,
     alignItems: 'center',
     position: 'absolute',
-    bottom: 70,
     left: '5%',
     right: '5%',
     borderRadius: 15,
@@ -679,7 +681,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+    zIndex: 10, // Asegura que esté por encima del mapa y otros elementos
   },
+  
   textoIndicador: {
     color: '#333',  // Color más oscuro para el texto
     fontSize: 16,
