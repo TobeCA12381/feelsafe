@@ -1,35 +1,60 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, TextInput, Button, Alert, TouchableOpacity } from 'react-native';
+import React from 'react';
+import { StyleSheet } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
+import { createDrawerNavigator } from '@react-navigation/drawer';
 import { NavigationContainer } from '@react-navigation/native';
 import Mapa from './Vistas/Mapa';
 import Inicio from './Vistas/Inicio';
 import Registrar from './Vistas/Registrar';
 
+const Stack = createStackNavigator();
+const Drawer = createDrawerNavigator();
+
+function MapaStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="MapaScreen" component={Mapa} />
+    </Stack.Navigator>
+  );
+}
+
+function DrawerNavigator() {
+  return (
+    <Drawer.Navigator
+      screenOptions={{
+        headerShown: true,
+        drawerStyle: {
+          backgroundColor: '#c6cbef',
+          width: 240,
+        },
+      }}
+    >
+      <Drawer.Screen
+        name="Mapa"
+        component={MapaStack}
+        options={{
+          headerShown: false,
+        }}
+      />
+      {/* Add other drawer screens here */}
+    </Drawer.Navigator>
+  );
+}
+
+function RootStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Login" component={Inicio} />
+      <Stack.Screen name="DrawerScreens" component={DrawerNavigator} />
+      <Stack.Screen name="Registro" component={Registrar} />
+    </Stack.Navigator>
+  );
+}
+
 export default function App() {
-  const Stack = createStackNavigator();
-
-  function MyStack() {
-    return (
-      <Stack.Navigator>
-        <Stack.Screen 
-          name="Login" 
-          component={Inicio} 
-          options={{ headerShown: false }} // Oculta el encabezado en la pantalla de inicio de sesión
-        />
-         <Stack.Screen 
-          name="Mapa" 
-          component={Mapa} 
-          options={{ headerShown: false }} // Oculta el encabezado en la pantalla del mapa
-        />
-        <Stack.Screen name="Registro" component={Registrar} />
-      </Stack.Navigator>
-    );
-  }
-
   return (
     <NavigationContainer>
-      <MyStack />
+      <RootStack />
     </NavigationContainer>
   );
 }

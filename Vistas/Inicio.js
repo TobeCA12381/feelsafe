@@ -26,7 +26,11 @@ const App = () => {
           <TextInput placeholder='Ingresa contraseña' style={styles.input} secureTextEntry />
         </View>
 
-        <Boton text="Iniciar Sesión" style={styles.botoningresar} onPress={() => navigation.navigate('Mapa')} />
+        <Boton
+          text="Iniciar Sesión"
+          style={styles.botoningresar}
+          onPress={() => navigation.navigate('DrawerScreens', { screen: 'Mapa' })}
+        />
 
         <View style={styles.socialLoginContainer}>
           <Text style={styles.socialLoginText}>Iniciar con:</Text>
@@ -45,8 +49,8 @@ const App = () => {
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.socialButton}>
-              <Image source={require('../Imagenes/developers.png')} style={styles.socialIcon} />
-            </TouchableOpacity>
+          <Image source={require('../Imagenes/developers.png')} style={styles.socialIcon} />
+        </TouchableOpacity>
       </View>
     </ImageBackground>
   );
