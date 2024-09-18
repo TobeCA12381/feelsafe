@@ -499,10 +499,6 @@ const esRutaIgualAPrincipal = (rutaAlternativa, segmentoPrincipal) => {
             onPress={manejarPresionMapa}
           >
            {coordenadasRuta.map((segmento, index) => {
-    if (!segmento || !Array.isArray(segmento.coordenadas)) {
-        console.error('Segmento inválido o sin coordenadas:', segmento);
-        return null; // No renderizar este segmento
-    }
 
     // Verifica que las coordenadas sean válidas
     const coordenadasValidas = segmento.coordenadas.every(coord => coord && typeof coord.latitude === 'number' && typeof coord.longitude === 'number');
@@ -550,10 +546,6 @@ const esRutaIgualAPrincipal = (rutaAlternativa, segmentoPrincipal) => {
               />
             )}
             {colorearRuta(coordenadasRuta, zonasPeligrosas).map((segmento, index) => {
-    if (!segmento || !Array.isArray(segmento.coordenadas) || segmento.coordenadas.length < 2) {
-        console.error('Segmento inválido o sin coordenadas suficientes:', segmento);
-        return null; // No renderizar este segmento
-    }
 
     return (
         <Polyline
