@@ -1,13 +1,141 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 
 const Seguridad = () => {
   return (
-    <View>
-      <Text>Página de Configuración</Text>
+    <View style={styles.container}>
+      {/* Header */}
+      <Text style={styles.header}>Seguridad</Text>
+
+      {/* Botones principales con imágenes */}
+      <View style={styles.row}>
+        <TouchableOpacity style={styles.button}>
+          <Image
+            source={{ uri: 'https://img.icons8.com/ios-filled/50/000000/technical-support.png' }} // Imagen Soporte
+            style={styles.iconImage}
+          />
+          <Text style={styles.buttonText}>Soporte</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.button}>
+          <Image
+            source={{ uri: 'https://img.icons8.com/ios-filled/50/000000/id-verified.png' }} // Imagen Verificación de identidad
+            style={styles.iconImage}
+          />
+          <Text style={styles.buttonText}>Contactos de emergencia</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Botón Llamar a emergencias */}
+      <TouchableOpacity style={styles.emergencyButton}>
+        <Text style={styles.emergencyText}>Llamar a emergencias</Text>
+      </TouchableOpacity>
+
+      {/* Sección 'Cómo estás protegido' */}
+      <Text style={styles.sectionTitle}>Cómo estás protegido</Text>
+
+      {/* Botones con imágenes de rutas seguras */}
+      <View style={styles.row}>
+        <TouchableOpacity style={styles.button}>
+          <Image
+            source={{ uri: 'https://img.icons8.com/ios-filled/50/000000/bell.png' }} // Imagen Alertas de seguridad             
+            style={styles.iconImage}
+          />
+          <Text style={styles.buttonText}>Alertas de seguridad</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.button}>
+          <Image
+            source={{ uri: 'https://img.icons8.com/ios-filled/50/000000/chat.png' }} // Imagen Chat de emergencias
+            style={styles.iconImage}
+          />
+          <Text style={styles.buttonText}>Chat de emergencias 24/7</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.row}>
+        <TouchableOpacity style={styles.button}>
+          <Image
+            source={{ uri: 'https://img.icons8.com/ios-filled/50/000000/walking.png' }} // Imagen Zonas con tráfico peatonal
+            style={styles.iconImage}
+          />
+          <Text style={styles.buttonText}>Zonas con más tráfico peatonal</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.button}>
+          <Image
+            source={{ uri: 'https://img.icons8.com/ios-filled/50/000000/marker.png' }} // Imagen Rutas seguras cercanas
+            style={styles.iconImage}
+          />
+          <Text style={styles.buttonText}>Rutas seguras cercanas</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.row}>
+        <TouchableOpacity style={styles.button}>
+          <Image
+            source={{ uri: 'https://img.icons8.com/ios-filled/50/000000/shield.png' }} // Imagen Funciones de seguridad
+            style={styles.iconImage}
+          />
+          <Text style={styles.buttonText}>Funciones de seguridad</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
 
-export default Seguridad;
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+    backgroundColor: '#1c1c1c',
+  },
+  header: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  button: {
+    flex: 1,
+    backgroundColor: '#2b2b2b',
+    padding: 15,
+    margin: 5,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  emergencyButton: {
+    backgroundColor: '#ff5c5c',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  emergencyText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  sectionTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  iconImage: {
+    width: 50,
+    height: 50,
+    marginBottom: 10,
+  },
+});
 
+export default Seguridad;
