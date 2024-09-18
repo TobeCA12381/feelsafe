@@ -503,10 +503,7 @@ const esRutaIgualAPrincipal = (rutaAlternativa, segmentoPrincipal) => {
     // Verifica que las coordenadas sean válidas
     const coordenadasValidas = segmento.coordenadas.every(coord => coord && typeof coord.latitude === 'number' && typeof coord.longitude === 'number');
 
-    if (!coordenadasValidas) {
-        console.error('Coordenadas inválidas para el segmento:', segmento);
-        return null; // No renderizar este segmento
-    }
+   
 
     return (
         <Polyline
