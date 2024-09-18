@@ -14,31 +14,52 @@ export const calcularDistancia = (punto1, punto2) => {
   
     return R * c;
   };
-  
+
   export const decodificarPolilinea = (t) => {
+    if (!t || typeof t !== 'string') {
+        console.error('Polilínea inválida:', t);
+        return [];
+    }
+
     let index = 0, lat = 0, lng = 0;
     const coordenadas = [];
-    while (index < t.length) {
-      let b, shift = 0, result = 0;
-      do {
-        b = t.charCodeAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      const dlat = (result & 1 ? ~(result >> 1) : result >> 1) / 1e5;
-      lat += dlat;
-      shift = result = 0;
-      do {
-        b = t.charCodeAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      const dlng = (result & 1 ? ~(result >> 1) : result >> 1) / 1e5;
-      lng += dlng;
-      coordenadas.push({ latitude: lat, longitude: lng });
+
+    try {
+        while (index < t.length) {
+            let b, shift = 0, result = 0;
+            do {
+                b = t.charCodeAt(index++) - 63;
+                result |= (b & 0x1f) << shift;
+                shift += 5;
+            } while (b >= 0x20);
+
+            const dlat = (result & 1 ? ~(result >> 1) : result >> 1) / 1e5;
+            lat += dlat;
+
+            shift = result = 0;
+            do {
+                b = t.charCodeAt(index++) - 63;
+                result |= (b & 0x1f) << shift;
+                shift += 5;
+            } while (b >= 0x20);
+
+            const dlng = (result & 1 ? ~(result >> 1) : result >> 1) / 1e5;
+            lng += dlng;
+
+            coordenadas.push({ latitude: lat, longitude: lng });
+        }
+    } catch (error) {
+        console.error('Error al decodificar la polilínea:', error);
+        return [];
     }
+
+    if (coordenadas.length === 0) {
+        console.error('No se pudieron decodificar las coordenadas de la polilínea.');
+    }
+
     return coordenadas;
-  };
+};
+
   
   export const obtenerIconoMarcador = (tipo) => {
     const iconos = {
@@ -103,35 +124,56 @@ export const calcularDistancia = (punto1, punto2) => {
   
   export const colorearRuta = (coordenadasRuta, zonasPeligrosas) => {
     const segmentosColoreados = [];
-    let zonasPeligrosasUnicas = new Set();
-  
-    for (let i = 0; i < coordenadasRuta.length - 1; i++) {
-      const puntoInicio = coordenadasRuta[i];
-      const puntoFin = coordenadasRuta[i + 1];
-      let puntuacionPeligroTotal = 0;
-  
-      zonasPeligrosas.forEach(zona => {
-        const distanciaInicio = calcularDistancia(puntoInicio, zona);
-        const distanciaFin = calcularDistancia(puntoFin, zona);
-        if (distanciaInicio < zona.umbral || distanciaFin < zona.umbral) {
-          puntuacionPeligroTotal += zona.peso;
-          zonasPeligrosasUnicas.add(zona.id);
-        }
-      });
-  
-      let colorSegmento = '#00FF00';
-      if (puntuacionPeligroTotal > 50) {
-        colorSegmento = '#FF0000';
-      } else if (puntuacionPeligroTotal > 20) {
-        colorSegmento = '#FFA500';
-      }
-  
-      segmentosColoreados.push({
-        coordenadas: [puntoInicio, puntoFin],
-        color: colorSegmento,
-      });
+
+    // Verificar que coordenadasRuta es un array y tiene al menos dos puntos
+    if (!Array.isArray(coordenadasRuta) || coordenadasRuta.length < 2) {
+        console.error('Ruta inválida:', coordenadasRuta);
+        return segmentosColoreados; // Retorna un array vacío
     }
-  
+
+    for (let i = 0; i < coordenadasRuta.length - 1; i++) {
+        const puntoInicio = coordenadasRuta[i];
+        const puntoFin = coordenadasRuta[i + 1];
+        let puntuacionPeligroTotal = 0;
+
+        // Verificar que los puntos tienen latitud y longitud válidas
+        if (
+            !puntoInicio ||
+            !puntoFin ||
+            typeof puntoInicio.latitude !== 'number' ||
+            typeof puntoInicio.longitude !== 'number' ||
+            typeof puntoFin.latitude !== 'number' ||
+            typeof puntoFin.longitude !== 'number'
+        ) {
+            console.error('Puntos inválidos para el segmento:', puntoInicio, puntoFin);
+            continue; // Saltar a la siguiente iteración si hay puntos inválidos
+        }
+
+        // Calcular la puntuación de peligro para el segmento actual
+        zonasPeligrosas.forEach(zona => {
+            const distanciaInicio = calcularDistancia(puntoInicio, zona);
+            const distanciaFin = calcularDistancia(puntoFin, zona);
+            if (distanciaInicio < zona.umbral || distanciaFin < zona.umbral) {
+                puntuacionPeligroTotal += zona.peso;
+            }
+        });
+
+        // Determinar el color del segmento según la puntuación de peligro
+        let colorSegmento = '#00FF00'; // Verde por defecto
+        if (puntuacionPeligroTotal > 50) {
+            colorSegmento = '#FF0000'; // Rojo
+        } else if (puntuacionPeligroTotal > 20) {
+            colorSegmento = '#FFA500'; // Naranja
+        }
+
+        // Añadir el segmento coloreado a la lista
+        segmentosColoreados.push({
+            coordenadas: [puntoInicio, puntoFin],
+            color: colorSegmento,
+            peligro: puntuacionPeligroTotal, // Guardamos el nivel de peligro por si es necesario
+        });
+    }
+
     return segmentosColoreados;
-  };
-  
+};
+

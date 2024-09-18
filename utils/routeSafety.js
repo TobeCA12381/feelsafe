@@ -25,36 +25,3 @@ export const verificarSeguridadLogaritmica = (coordenadasRuta, zonasPeligrosas) 
   };
 };
 
-export const colorearRuta = (coordenadasRuta, zonasPeligrosas) => {
-  const segmentosColoreados = [];
-  let zonasPeligrosasUnicas = new Set();
-
-  for (let i = 0; i < coordenadasRuta.length - 1; i++) {
-    const puntoInicio = coordenadasRuta[i];
-    const puntoFin = coordenadasRuta[i + 1];
-    let puntuacionPeligroTotal = 0;
-
-    zonasPeligrosas.forEach(zona => {
-      const distanciaInicio = calcularDistancia(puntoInicio, zona);
-      const distanciaFin = calcularDistancia(puntoFin, zona);
-      if (distanciaInicio < zona.umbral || distanciaFin < zona.umbral) {
-        puntuacionPeligroTotal += zona.peso;
-        zonasPeligrosasUnicas.add(zona.id);
-      }
-    });
-
-    let colorSegmento = '#00FF00';
-    if (puntuacionPeligroTotal > 50) {
-      colorSegmento = '#FF0000';
-    } else if (puntuacionPeligroTotal > 20) {
-      colorSegmento = '#FFA500';
-    }
-
-    segmentosColoreados.push({
-      coordenadas: [puntoInicio, puntoFin],
-      color: colorSegmento,
-    });
-  }
-
-  return segmentosColoreados;
-};
