@@ -5,7 +5,7 @@ import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useNavigation } from '@react-navigation/native';
 import { GOOGLE_MAPS_APIKEY } from '@env';
-import { calcularDistancia, decodificarPolilinea, obtenerIconoMarcador, geocodificarInversoCoordenada, geocodificarDireccion, colorearRuta } from '../utils/mapUtils';
+import {decodificarPolilinea, obtenerIconoMarcador, geocodificarInversoCoordenada, geocodificarDireccion, colorearRuta,RenderRuta } from '../utils/mapUtils';
 import { verificarSeguridadLogaritmica } from '../utils/routeSafety';
 import ViewShot from 'react-native-view-shot';
 import * as FileSystem from 'expo-file-system'; // Importamos expo-file-system para manejar archivos
@@ -58,15 +58,16 @@ export default function PantallaMapa() {
   const mapShotRef = useRef(null);
 
   const zonasPeligrosas = useMemo(() => [
-    { id: 1, latitude: -11.984, longitude: -77.007, descripcion: 'Zona peligrosa 1', tipo: 'ACOSO', umbral: UMBRAL_PELIGRO_METROS, peso: 30 },
-    { id: 2, latitude: -11.982, longitude: -77.003, descripcion: 'Zona peligrosa 2', tipo: 'CRIMEN', umbral: UMBRAL_PELIGRO_METROS, peso: 50 },
-    { id: 3, latitude: -11.980, longitude: -77.004, descripcion: 'Tienda 1', tipo: 'DROGAS', umbral: UMBRAL_PELIGRO_METROS, peso: 20 },
-    { id: 4, latitude: -11.979, longitude: -77.005, descripcion: 'Robo a Casa', tipo: 'ROBO_A_CASA', umbral: UMBRAL_PELIGRO_METROS, peso: 40 },
-    { id: 5, latitude: -11.978, longitude: -77.006, descripcion: 'Robo a Comercio', tipo: 'ROBO_A_COMERCIO', umbral: UMBRAL_PELIGRO_METROS, peso: 45 },
-    { id: 6, latitude: -11.977, longitude: -77.007, descripcion: 'Robo a Persona', tipo: 'ROBO_A_PERSONA', umbral: UMBRAL_PELIGRO_METROS, peso: 35 },
-    { id: 7, latitude: -11.976, longitude: -77.008, descripcion: 'Robo a Vehículo', tipo: 'ROBO_A_VEHICULO', umbral: UMBRAL_PELIGRO_METROS, peso: 30 },
-    { id: 8, latitude: -11.975, longitude: -77.009, descripcion: 'Sospechoso', tipo: 'SOSPECHOSO', umbral: UMBRAL_PELIGRO_METROS, peso: 25 },
-    { id: 9, latitude: -11.974, longitude: -77.010, descripcion: 'Vandalismo', tipo: 'VANDALISMO', umbral: UMBRAL_PELIGRO_METROS, peso: 30 },
+    { id: 1, latitude: -11.984, longitude: -77.007, descripcion: 'Zona de acoso', tipo: 'ACOSO', umbral: UMBRAL_PELIGRO_METROS, peso: 60 },
+    { id: 2, latitude: -11.982, longitude: -77.003, descripcion: 'Zona de crimen violento', tipo: 'CRIMEN', umbral: UMBRAL_PELIGRO_METROS, peso: 90 },
+    { id: 3, latitude: -11.980, longitude: -77.004, descripcion: 'Zona de venta de drogas', tipo: 'DROGAS', umbral: UMBRAL_PELIGRO_METROS, peso: 70 },
+    { id: 4, latitude: -11.979, longitude: -77.005, descripcion: 'Área de robos a casa', tipo: 'ROBO_A_CASA', umbral: UMBRAL_PELIGRO_METROS, peso: 65 },
+    { id: 5, latitude: -11.978, longitude: -77.006, descripcion: 'Zona de robos a comercios', tipo: 'ROBO_A_COMERCIO', umbral: UMBRAL_PELIGRO_METROS, peso: 55 },
+    { id: 6, latitude: -11.977, longitude: -77.007, descripcion: 'Área de robos a personas', tipo: 'ROBO_A_PERSONA', umbral: UMBRAL_PELIGRO_METROS, peso: 75 },
+    { id: 7, latitude: -11.976, longitude: -77.008, descripcion: 'Zona de robos de vehículos', tipo: 'ROBO_A_VEHICULO', umbral: UMBRAL_PELIGRO_METROS, peso: 50 },
+    { id: 8, latitude: -11.975, longitude: -77.009, descripcion: 'Área de actividad sospechosa', tipo: 'SOSPECHOSO', umbral: UMBRAL_PELIGRO_METROS, peso: 40 },
+    { id: 9, latitude: -11.974, longitude: -77.010, descripcion: 'Zona de vandalismo', tipo: 'VANDALISMO', umbral: UMBRAL_PELIGRO_METROS, peso: 30 },
+  
   ], []);
 
 
@@ -116,167 +117,63 @@ export default function PantallaMapa() {
     }));
   }, []);
 
-  useEffect(() => {
-    if (origen && destino) {
-      ajustarRutaSegura();
-    }
-  }, [origen, destino, modoViaje, ajustarRutaSegura]);
-  
+
+
 
   const obtenerRuta = useCallback(async () => {
     if (!origen || !destino) {
-        Alert.alert('Error', 'Debe seleccionar un origen y un destino');
-        return;
+      Alert.alert('Error', 'Debe seleccionar un origen y un destino');
+      return;
     }
 
     setLoading(true);
 
     try {
-        const urlDirecciones = `https://maps.googleapis.com/maps/api/directions/json?origin=${origen.latitude},${origen.longitude}&destination=${destino.latitude},${destino.longitude}&mode=${modoViaje}&key=${GOOGLE_MAPS_APIKEY}`;
-        const respuesta = await fetch(urlDirecciones);
-        const datos = await respuesta.json();
-
-        if (datos.status === "OK" && datos.routes.length > 0) {
-            const ruta = datos.routes[0];
-
-            if (!ruta.overview_polyline || !ruta.overview_polyline.points) {
-                throw new Error('No se encontró una polilínea válida en la respuesta de la API.');
-            }
-
-            const puntosDecodificados = decodificarPolilinea(ruta.overview_polyline.points);
-
-            if (!puntosDecodificados || puntosDecodificados.length === 0) {
-                throw new Error('Puntos decodificados inválidos.');
-            }
-
-            // Llamar a ajustarRutaSegura con los puntos decodificados
-            await ajustarRutaSegura(puntosDecodificados);
-
-            const { puntosPeligrosos, puntuacion } = verificarSeguridadLogaritmica(puntosDecodificados, zonasPeligrosas);
-
-            setPuntuacionSeguridad(puntuacion);
-            setSeguridadRuta(puntuacion < 50 ? 'peligroso' : puntuacion < 75 ? 'moderado' : 'seguro');
-
-            console.log("Puntos peligrosos encontrados:", JSON.stringify(puntosPeligrosos, null, 2));
-
-            if (puntosPeligrosos.length > 0) {
-                setZonasPeligrosasEncontradas(puntosPeligrosos);
-                setMostrarIconoAlerta(true);
-            } else {
-                setZonasPeligrosasEncontradas([]);
-                setMostrarIconoAlerta(false);
-            }
-        } else {
-            throw new Error('No se encontraron rutas. Por favor, verifique las ubicaciones e intente de nuevo.');
-        }
-    } catch (error) {
-        console.error('Error al obtener la ruta:', error);
-        Alert.alert('Error', `Hubo un problema al generar la ruta: ${error.message}`);
-    } finally {
-        setLoading(false);
-    }
-}, [origen, destino, modoViaje, zonasPeligrosas, ajustarRutaSegura]);
-
-  
-const ajustarRutaSegura = useCallback(async (puntosDecodificados) => {
-  if (!puntosDecodificados || puntosDecodificados.length < 2) {
-      console.error('Puntos decodificados inválidos:', puntosDecodificados);
-      return;
-  }
-
-  // Limpia las rutas alternativas antes de dibujar nuevas
-  setCoordenadasRutaAlternativas([]);
-
-  const segmentos = colorearRuta(puntosDecodificados, zonasPeligrosas);
-  const nuevaRuta = [];
-
-  for (let i = 0; i < segmentos.length; i++) {
-      const segmento = segmentos[i];
-      
-      if (segmento.color === '#00FF00') {
-          // Segmento Verde: Mantener la ruta
-          nuevaRuta.push(...segmento.coordenadas);
-      } else {
-          // Segmento Naranja o Rojo: Buscar alternativas
-          const puntoInicio = segmento.coordenadas[0];
-          const alternativas = await buscarRutasAlternativas(puntoInicio, destino);
-
-          if (alternativas.length > 0) {
-              const mejorAlternativa = alternativas[0];
-
-              if (segmento.color === '#FF0000' && mejorAlternativa.nivelSeguridad > 50) {
-                  // Segmento Rojo: Reemplazar con la alternativa más segura
-                  nuevaRuta.push(...mejorAlternativa.coordenadas);
-                  i = segmentos.length; // Finalizar el bucle ya que hemos encontrado una alternativa segura
-              } else if (segmento.color === '#FFA500') {
-                  // Segmento Naranja: Mostrar alternativas con líneas discontinuas
-                  if (!esRutaIgualAPrincipal(mejorAlternativa.coordenadas, segmento.coordenadas)) {
-                      setCoordenadasRutaAlternativas((prevAlternativas) => [
-                          ...prevAlternativas,
-                          { coordenadas: mejorAlternativa.coordenadas, color: '#FFA500', tipo: 'discontinua' },
-                      ]);
-                  }
-                  // Continuar con la ruta principal
-                  nuevaRuta.push(...segmento.coordenadas);
-              }
-          } else {
-              // No se encontró alternativa, continuar con la ruta original
-              nuevaRuta.push(...segmento.coordenadas);
-          }
-      }
-  }
-
-  setCoordenadasRuta(nuevaRuta);
-  ajustarVistaRuta(nuevaRuta);
-}, [zonasPeligrosas, destino, buscarRutasAlternativas, ajustarVistaRuta]);
-
-
-const buscarRutasAlternativas = async (puntoInicio, destino) => {
-  try {
-      const urlAlternativa = `https://maps.googleapis.com/maps/api/directions/json?origin=${puntoInicio.latitude},${puntoInicio.longitude}&destination=${destino.latitude},${destino.longitude}&mode=${modoViaje}&alternatives=true&key=${GOOGLE_MAPS_APIKEY}`;
-      
-      const respuesta = await fetch(urlAlternativa);
+      const urlDirecciones = `https://maps.googleapis.com/maps/api/directions/json?origin=${origen.latitude},${origen.longitude}&destination=${destino.latitude},${destino.longitude}&mode=${modoViaje}&key=${GOOGLE_MAPS_APIKEY}`;
+      const respuesta = await fetch(urlDirecciones);
       const datos = await respuesta.json();
 
       if (datos.status === "OK" && datos.routes.length > 0) {
-          const rutasAlternativas = [];
+        const ruta = datos.routes[0];
 
-          for (const ruta of datos.routes) {
-              const puntosDecodificados = decodificarPolilinea(ruta.overview_polyline.points);
-              
-              // Verificar si la ruta alternativa es igual al segmento principal
-              if (!esRutaIgualAPrincipal(puntosDecodificados, coordenadasRuta)) {
-                  rutasAlternativas.push({
-                      coordenadas: puntosDecodificados,
-                      nivelSeguridad: verificarSeguridadLogaritmica(puntosDecodificados, zonasPeligrosas).puntuacion,
-                  });
-              }
-          }
+        if (!ruta.overview_polyline || !ruta.overview_polyline.points) {
+          throw new Error('No se encontró una polilínea válida en la respuesta de la API.');
+        }
 
-          return rutasAlternativas;
+        const puntosDecodificados = decodificarPolilinea(ruta.overview_polyline.points);
+        if (!puntosDecodificados || puntosDecodificados.length === 0) {
+            throw new Error('Puntos decodificados inválidos.');
+        }
+        //console.log('Puntos decodificados:', puntosDecodificados);
+        setCoordenadasRuta(puntosDecodificados);
+
+        const { puntosPeligrosos, puntuacion } = verificarSeguridadLogaritmica(puntosDecodificados, zonasPeligrosas);
+
+        setPuntuacionSeguridad(puntuacion);
+        setSeguridadRuta(puntuacion < 50 ? 'peligroso' : puntuacion < 75 ? 'moderado' : 'seguro');
+
+        if (puntosPeligrosos.length > 0) {
+          setZonasPeligrosasEncontradas(puntosPeligrosos);
+          setMostrarIconoAlerta(true);
+        } else {
+          setZonasPeligrosasEncontradas([]);
+          setMostrarIconoAlerta(false);
+        }
+
+        ajustarVistaRuta(puntosDecodificados);
       } else {
-          throw new Error('No se encontró una ruta alternativa');
+        throw new Error('No se encontraron rutas. Por favor, verifique las ubicaciones e intente de nuevo.');
       }
-  } catch (error) {
-      console.error('Error al buscar rutas alternativas:', error);
-      Alert.alert('Error', 'No se pudo generar una ruta alternativa. ' + error.message);
-      return [];
-  }
-};
+    } catch (error) {
+      console.error('Error al obtener la ruta:', error);
+      Alert.alert('Error', `Hubo un problema al generar la ruta: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [origen, destino, modoViaje, zonasPeligrosas, ajustarVistaRuta]);
 
-const esRutaIgualAPrincipal = (rutaAlternativa, segmentoPrincipal) => {
-  if (rutaAlternativa.length !== segmentoPrincipal.length) {
-      return false;
-  }
 
-  return rutaAlternativa.every((punto, index) => {
-      const puntoPrincipal = segmentoPrincipal[index];
-      return (
-          punto.latitude === puntoPrincipal.latitude &&
-          punto.longitude === puntoPrincipal.longitude
-      );
-  });
-};
+
 
 
 
@@ -470,7 +367,7 @@ const esRutaIgualAPrincipal = (rutaAlternativa, segmentoPrincipal) => {
     }
   }, [seleccionandoOrigen, actualizarRegionMapa, geocodificarInversoCoordenada]);
 
-
+ 
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
@@ -480,7 +377,7 @@ const esRutaIgualAPrincipal = (rutaAlternativa, segmentoPrincipal) => {
       {/* Top bar overlay */}
       <View style={styles.topBar} />
 
-        <ViewShot ref={mapShotRef} options={{ format: "jpg", quality: 0.8, result: "tmpfile" }} style={StyleSheet.absoluteFillObject}>
+      <ViewShot ref={mapShotRef} options={{ format: "jpg", quality: 0.8, result: "tmpfile" }} style={StyleSheet.absoluteFillObject}>
         <View style={styles.contenedor}>
           {/* Notificación para habilitar GPS */}
           {!gpsEnabled && (
@@ -490,7 +387,7 @@ const esRutaIgualAPrincipal = (rutaAlternativa, segmentoPrincipal) => {
               </Text>
             </TouchableOpacity>
           )}
-          
+
           <MapView
             ref={mapRef}
             style={styles.mapa}
@@ -498,34 +395,25 @@ const esRutaIgualAPrincipal = (rutaAlternativa, segmentoPrincipal) => {
             onRegionChangeComplete={setRegionMapa}
             onPress={manejarPresionMapa}
           >
-           {coordenadasRuta.map((segmento, index) => {
+            <RenderRuta coordenadasRuta={coordenadasRuta} zonasPeligrosas={zonasPeligrosas} />
+            {coordenadasRuta.map((segmento, index) => {
+              if (!segmento || !Array.isArray(segmento.coordenadas)) {
+                //console.error('Segmento inválido o sin coordenadas:', segmento);
+                return null; // No renderizar este segmento
+              }
 
-    // Verifica que las coordenadas sean válidas
-    const coordenadasValidas = segmento.coordenadas.every(coord => coord && typeof coord.latitude === 'number' && typeof coord.longitude === 'number');
+              // Verifica que las coordenadas sean válidas
+              const coordenadasValidas = segmento.coordenadas.every(coord => coord && typeof coord.latitude === 'number' && typeof coord.longitude === 'number');
 
-   
+              if (!coordenadasValidas) {
+                console.error('Coordenadas inválidas para el segmento:', segmento);
+                return null; // No renderizar este segmento
+              }
 
-    return (
-        <Polyline
-            key={index}
-            coordinates={segmento.coordenadas}
-            strokeColor={segmento.tipo === 'discontinua' ? '#FFA500' : segmento.color}
-            strokeWidth={3}
-            lineDashPattern={segmento.tipo === 'discontinua' ? [10, 5] : [1]}
-        />
-    );
-})}
+            })}
 
 
-    {coordenadasRutaAlternativas.map((alternativa, index) => (
-        <Polyline
-            key={`alt-${index}`}
-            coordinates={alternativa.coordenadas}
-            strokeColor={alternativa.color}
-            strokeWidth={3}
-            lineDashPattern={alternativa.tipo === 'discontinua' ? [10, 5] : [1]}
-        />
-    ))}
+
             {origen && (
               <Marker
                 coordinate={origen}
@@ -543,16 +431,20 @@ const esRutaIgualAPrincipal = (rutaAlternativa, segmentoPrincipal) => {
               />
             )}
             {colorearRuta(coordenadasRuta, zonasPeligrosas).map((segmento, index) => {
+              if (!segmento || !Array.isArray(segmento.coordenadas) || segmento.coordenadas.length < 2) {
+                //console.error('Segmento inválido o sin coordenadas suficientes:', segmento);
+                return null; // No renderizar este segmento
+              }
 
-    return (
-        <Polyline
-            key={index}
-            coordinates={segmento.coordenadas}
-            strokeColor={segmento.color}
-            strokeWidth={3}
-        />
-    );
-})}
+              return (
+                <Polyline
+                  key={index}
+                  coordinates={segmento.coordenadas}
+                  strokeColor={segmento.color}
+                  strokeWidth={3}
+                />
+              );
+            })}
             {zonasPeligrosas.map((zona) => (
               <Marker
                 key={zona.id}
@@ -648,14 +540,14 @@ const esRutaIgualAPrincipal = (rutaAlternativa, segmentoPrincipal) => {
             <TouchableOpacity style={styles.botonMenu} onPress={abrirMenuLateral}>
               <Ionicons name="menu" size={30} color="#FFF" />
               {/* Envuelve el texto en un componente <Text> */}
-             
+
             </TouchableOpacity>
 
             {/* Botón flotante de compartir */}
             <TouchableOpacity style={styles.botonShare} onPress={abrirModalCompartir}>
               <Ionicons name="share-social-outline" size={30} color="#FFF" />
               {/* Envuelve el texto en un componente <Text> */}
-            
+
             </TouchableOpacity>
           </View>
 
@@ -692,7 +584,7 @@ const esRutaIgualAPrincipal = (rutaAlternativa, segmentoPrincipal) => {
   );
 
 
-  
+
 }
 
 

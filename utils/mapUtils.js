@@ -1,5 +1,6 @@
 import * as Location from 'expo-location';
 import { GOOGLE_MAPS_APIKEY } from '@env';
+import React, { useMemo } from 'react';
 export const calcularDistancia = (punto1, punto2) => {
     const R = 6371e3; // Radio de la tierra en metros
     const φ1 = punto1.latitude * Math.PI / 180;
@@ -127,7 +128,7 @@ export const calcularDistancia = (punto1, punto2) => {
 
     // Verificar que coordenadasRuta es un array y tiene al menos dos puntos
     if (!Array.isArray(coordenadasRuta) || coordenadasRuta.length < 2) {
-        console.error('Ruta inválida:', coordenadasRuta);
+        //console.error('Ruta inválida:', coordenadasRuta);
         return segmentosColoreados; // Retorna un array vacío
     }
 
@@ -177,3 +178,43 @@ export const calcularDistancia = (punto1, punto2) => {
     return segmentosColoreados;
 };
 
+export const RenderRuta = ({ coordenadasRuta, zonasPeligrosas }) => {
+  const segmentosColoreados = useMemo(() => {
+    if (coordenadasRuta.length > 0) {
+      //console.log('Coordenadas de ruta:', coordenadasRuta);
+      //console.log('Zonas peligrosas:', zonasPeligrosas);
+      const resultado = colorearRuta(coordenadasRuta, zonasPeligrosas);
+      //console.log('Resultado de colorearRuta:', resultado);
+      if (!resultado || !resultado.segmentos) {
+        //console.error('colorearRuta no devolvió un objeto válido');
+        return [];
+      }
+      return resultado.segmentos;
+    }
+    return [];
+  }, [coordenadasRuta, zonasPeligrosas]);
+
+  if (!segmentosColoreados || !Array.isArray(segmentosColoreados)) {
+    console.error('segmentosColoreados no es un array válido:', segmentosColoreados);
+    return null;
+  }
+
+  return (
+    <>
+      {segmentosColoreados.map((segmento, index) => {
+        if (!segmento || !segmento.coordenadas || !Array.isArray(segmento.coordenadas)) {
+          console.error('Segmento inválido:', segmento);
+          return null;
+        }
+        return (
+          <Polyline
+            key={index}
+            coordinates={segmento.coordenadas}
+            strokeColor={segmento.color || '#000000'}
+            strokeWidth={3}
+          />
+        );
+      })}
+    </>
+  );
+};
