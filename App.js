@@ -170,9 +170,8 @@ const styles = StyleSheet.create({
 
   botonMenu: {
     position: 'absolute',
-    top: 40,
-    left: 20,
-    backgroundColor: '#000',
+    top: 10,
+    
     borderRadius: 25,
     padding: 10,
     zIndex: 1,

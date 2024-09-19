@@ -7,13 +7,14 @@ import { Title } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import * as ImagePicker from 'expo-image-picker'; // Usa expo-image-picker
+import { Appbar } from 'react-native-paper'; // Importamos AppBar de react-native-paper
 
 const DrawerList = [
   // Aquí van los items de navegación si los necesitas
 ];
 
 const DrawerLayout = ({ icon, label, navigateTo }) => {
-  const navigation = useNavigation();
+
   return (
     <DrawerItem
       icon={({ color, size }) => <Icon name={icon} color={color} size={size} />}
@@ -41,6 +42,11 @@ const DrawerItems = () => {
 function DrawerContent(props) {
   // Estado para la imagen seleccionada
   const [imageUri, setImageUri] = useState(null);
+  const navigation = useNavigation();
+  
+  const handleBackPress = () => {
+    navigation.navigate('Asignar Ruta'); // Regresa a la ruta de tu menú principal
+  };
 
   // Función para seleccionar imagen de la galería con expo-image-picker
   const pickImage = async () => {
@@ -58,6 +64,11 @@ function DrawerContent(props) {
 
   return (
     <View style={{ flex: 1 }}>
+      {/* AppBar */}
+      <Appbar.Header style={styles.appBar}>
+        <Appbar.BackAction onPress={handleBackPress} color="#FFF" left={10}/>
+        <Appbar.Content title="Usuario" titleStyle={styles.appBarTitle} />
+      </Appbar.Header>
       <DrawerContentScrollView {...props}>
         <View style={styles.drawerContent}>
           <TouchableOpacity activeOpacity={0.8} onPress={pickImage}>
@@ -101,6 +112,14 @@ function DrawerContent(props) {
 
 export default DrawerContent;
 const styles = StyleSheet.create({
+  appBar: {
+    backgroundColor: '#2b2b2b',
+    left: 30
+  },
+  appBarTitle: {
+    color: '#fff',
+    left: 15
+  },
   drawerContent: {
     flex: 1,
   },
