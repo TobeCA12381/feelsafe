@@ -12,12 +12,15 @@ import * as FileSystem from 'expo-file-system'; // Importamos expo-file-system p
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
-
+import RouteInputPanel from '../Componentes/RouteInputPanel'; // Asegúrate de que la ruta de importación sea correcta
 // Obtiene las dimensiones de la pantalla
-const { width, height } = Dimensions.get('window');
+
 const UMBRAL_PELIGRO_METROS = 100;
 
 export default function PantallaMapa() {
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const { height } = Dimensions.get('window');
   const navigation = useNavigation();
   const { colors } = useTheme();
   const [origen, setOrigen] = useState(null);
@@ -46,7 +49,6 @@ export default function PantallaMapa() {
   const [shareModalVisible, setShareModalVisible] = useState(false);
   const drawerRef = useRef(null);
   const [gpsEnabled, setGpsEnabled] = useState(false);
-  const { width, height } = Dimensions.get('window');
   const [coordenadasRutaAlternativas, setCoordenadasRutaAlternativas] = useState([]);
   // Función para abrir el modal
   const abrirModalPeligros = useCallback(() => {
@@ -89,21 +91,37 @@ export default function PantallaMapa() {
     return () => clearInterval(gpsCheckInterval); // Limpia el intervalo cuando el componente se desmonte
   }, []);
 
-  useEffect(() => {
-    if (isDragging) {
-      Animated.timing(fadeAnim, {
-        toValue: 0, // Ocultar inputs
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      Animated.timing(fadeAnim, {
-        toValue: 1, // Mostrar inputs
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
+
+  const manejarCambioInputDesdePanel = useCallback(async (texto, esOrigen) => {
+    try {
+      if (texto) {
+        const coordenada = await geocodificarDireccion(texto);
+        if (coordenada) {
+          if (esOrigen) {
+            setOrigen(coordenada);
+            setInputOrigen(texto);
+            actualizarRegionMapa(coordenada);
+          } else {
+            setDestino(coordenada);
+            setInputDestino(texto);
+            actualizarRegionMapa(coordenada);
+          }
+  
+          // Si ya tenemos origen y destino, genera la ruta automáticamente
+          if (origen && destino) {
+            obtenerRuta();
+          }
+        } else {
+          Alert.alert("No se encontraron coordenadas para la dirección ingresada");
+        }
+      }
+    } catch (error) {
+      console.error("Error al geocodificar la dirección:", error);
     }
-  }, [isDragging]);
+  }, [origen, destino, actualizarRegionMapa, obtenerRuta, geocodificarDireccion]);
+  
+
+
 
   // Variable para almacenar el intervalo de verificación
   let gpsCheckInterval = null;
@@ -112,7 +130,7 @@ export default function PantallaMapa() {
   const startCheckingGpsStatus = () => {
     gpsCheckInterval = setInterval(() => {
       checkGpsStatus();
-    }, 5000); // Verifica cada 5 segundos
+    }, 2000); // Verifica cada 2 segundos
   };
 
   const checkGpsStatus = async () => {
@@ -125,7 +143,27 @@ export default function PantallaMapa() {
     setGpsEnabled(enabled);
   };
 
+  const openPanel = () => {
+    setIsPanelOpen(true);
+    Animated.timing(slideAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
 
+  const closePanel = () => {
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => setIsPanelOpen(false));
+  };
+
+  const panelTranslateY = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [height, 0], // El panel se desliza desde abajo hacia arriba
+  });
 
 
   const handleEnableLocation = () => {
@@ -284,7 +322,7 @@ export default function PantallaMapa() {
     if (fadeAnim._value !== 1) {
       Animated.timing(fadeAnim, {
         toValue: 1,  // Mostrar
-        duration: 7,  // Aumenta la duración para una transición más suave
+        duration: 3,  // Aumenta la duración para una transición más suave
         useNativeDriver: true,
       }).start();
     }
@@ -449,47 +487,54 @@ export default function PantallaMapa() {
   const manejarPresionMapa = useCallback((e) => {
     const { latitude, longitude } = e.nativeEvent.coordinate;
     const coordenada = { latitude, longitude };
-
-    iniciarAnimacionSalto(); // Inicia la animación cuando el marcador se está moviendo
-
-    setLoading(true);
-    actualizarRegionMapa(coordenada);
-
-    if (seleccionandoOrigen) {
-      setOrigen(coordenada);
-      geocodificarInversoCoordenada(coordenada, (direccion) => {
-        setInputOrigen(direccion);
-        setLoading(false);
-        finalizarAnimacionSalto(); // Finaliza la animación cuando se detiene
-      });
-    } else {
-      setDestino(coordenada);
-      geocodificarInversoCoordenada(coordenada, (direccion) => {
-        setInputDestino(direccion);
-        setLoading(false);
-        finalizarAnimacionSalto(); // Finaliza la animación cuando se detiene
-      });
+  
+    if (!destino) {  // Solo permite mover el marcador si el destino aún no se ha establecido
+      iniciarAnimacionSalto(); 
+  
+      setLoading(true);
+      actualizarRegionMapa(coordenada);
+  
+      if (seleccionandoOrigen) {
+        setOrigen(coordenada);
+        geocodificarInversoCoordenada(coordenada, (direccion) => {
+          setInputOrigen(direccion);
+          setLoading(false);
+          finalizarAnimacionSalto(); 
+        });
+      } else {
+        setDestino(coordenada);
+        geocodificarInversoCoordenada(coordenada, (direccion) => {
+          setInputDestino(direccion);
+          setLoading(false);
+          finalizarAnimacionSalto(); 
+        });
+      }
     }
-  }, [seleccionandoOrigen, actualizarRegionMapa, geocodificarInversoCoordenada]);
+  }, [seleccionandoOrigen, actualizarRegionMapa, geocodificarInversoCoordenada, destino]);
+  
 
-  // Función para iniciar la animación de salto
-  const iniciarAnimacionSalto = () => {
-    Animated.spring(markerAnim, {
-      toValue: 1,
-      friction: 5,
-      tension: 40,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const finalizarAnimacionSalto = () => {
-    Animated.spring(markerAnim, {
-      toValue: 0,
-      friction: 5,
-      tension: 40,
-      useNativeDriver: true,
-    }).start();
-  };
+  const iniciarAnimacionSalto = useCallback(() => {
+    if (!destino) { // Solo realiza la animación si el destino no ha sido seleccionado
+      Animated.spring(markerAnim, {
+        toValue: 1,
+        friction: 5,
+        tension: 40,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [destino]);
+  
+  const finalizarAnimacionSalto = useCallback(() => {
+    if (!destino) { // Solo finaliza la animación si el destino no ha sido seleccionado
+      Animated.spring(markerAnim, {
+        toValue: 0,
+        friction: 5,
+        tension: 40,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [destino]);
+  
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
@@ -508,7 +553,7 @@ export default function PantallaMapa() {
           <MapView
             ref={mapRef}
             style={styles.mapa}
-            region={regionMapa}
+            region={regionMapa} // Actualizamos el estado `regionMapa` con las nuevas coordenadas
             onRegionChange={onRegionChange}
             onRegionChangeComplete={onRegionChangeComplete}
           >
@@ -660,40 +705,66 @@ export default function PantallaMapa() {
 
 
           <View style={[styles.contenedorInput]}>
-            <TouchableOpacity
-              style={[styles.indicadorSeguridad, {
-                backgroundColor: seguridadRuta === 'peligroso' ? '#FFCCCC' : seguridadRuta === 'moderado' ? '#FFF5CC' : '#CCFFCC',
-                borderWidth: 1,
-                borderColor: 'blue',
-                position: 'absolute',
-                bottom: 240,
-                left: '5%',
-                right: '5%',
-                zIndex: 10
-              }]}
-              onPress={abrirModalPeligros}
-            >
-              <Text style={{ color: seguridadRuta === 'peligroso' ? '#FF0000' : seguridadRuta === 'moderado' ? '#FFA500' : '#00FF00', fontSize: 16, fontWeight: 'bold' }}>
-                Nivel de seguridad: {seguridadRuta}
-              </Text>
-              <Text style={{ fontSize: 14 }}>Puntuación de seguridad: {puntuacionSeguridad}</Text>
-            </TouchableOpacity>
+            <View style={styles.container}>
+              <TouchableOpacity
+                style={[styles.indicadorSeguridad, {
+                  backgroundColor: seguridadRuta === 'peligroso' ? '#FFCCCC' : seguridadRuta === 'moderado' ? '#FFF5CC' : '#CCFFCC',
+                  borderWidth: 1,
+                  borderColor: 'blue',
+                  position: 'absolute',
+                  bottom: 240,
+                  left: '5%',
+                  right: '5%',
+                  zIndex: 10
+                }]}
+                onPress={abrirModalPeligros}
+              >
+                <Text style={{ color: seguridadRuta === 'peligroso' ? '#FF0000' : seguridadRuta === 'moderado' ? '#FFA500' : '#00FF00', fontSize: 16, fontWeight: 'bold' }}>
+                  Nivel de seguridad: {seguridadRuta}
+                </Text>
+                <Text style={{ fontSize: 14 }}>Puntuación de seguridad: {puntuacionSeguridad}</Text>
+              </TouchableOpacity>
 
-            <TextInput
-              style={styles.input}
-              placeholder="¿Dónde estamos?"
-              value={inputOrigen}
-              onChangeText={(texto) => manejarCambioInput(texto, true)}
-              onFocus={() => setSeleccionandoOrigen(true)}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="¿Adónde vamos?"
-              value={inputDestino}
-              onChangeText={(texto) => manejarCambioInput(texto, false)}
-              onFocus={() => setSeleccionandoOrigen(false)}
-            />
+              <TouchableOpacity
+                style={styles.input}
+                onPress={() => {
+                  setSeleccionandoOrigen(true);  // Indica que estamos seleccionando el origen
+                  openPanel();  // Abre el panel
+                }}
+              >
+                <Text style={styles.textPlaceholder}>
+                  {inputOrigen || "¿Dónde estamos?"}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.input}
+                onPress={() => {
+                  setSeleccionandoOrigen(false);  // Indica que estamos seleccionando el destino
+                  openPanel();  // Abre el panel
+                }}
+              >
+                <Text style={styles.textPlaceholder}>
+                  {inputDestino || "¿Adónde vamos?"}
+                </Text>
+              </TouchableOpacity>
+
+            </View>
           </View>
+          {/* Panel deslizante */}
+          {isPanelOpen && (
+            <Animated.View style={[styles.panel, { transform: [{ translateY: panelTranslateY }] }]}>
+              <RouteInputPanel
+                onClose={closePanel} // Cierra el panel
+                setOrigenInput={(texto) => manejarCambioInputDesdePanel(texto, true)} // Llama a la función para actualizar el origen
+                setDestinoInput={(texto) => manejarCambioInputDesdePanel(texto, false)} // Llama a la función para actualizar el destino
+                origenValue={inputOrigen} // Pasa el valor actual del origen
+                destinoValue={inputDestino} // Pasa el valor actual del destino
+              />
+
+
+            </Animated.View>
+          )}
         </View>
       </ViewShot>
     </SafeAreaView>
@@ -706,6 +777,49 @@ export default function PantallaMapa() {
 
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+  },
+  textInput: {
+    borderColor: '#ccc',
+    borderWidth: 1,
+    padding: 10,
+    marginBottom: 20,
+  },
+
+  panelHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  panelTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  closeButton: {
+    backgroundColor: '#444',
+    borderRadius: 15,
+    padding: 5,
+  },
+  closeButtonText: {
+    color: '#fff',
+    fontSize: 18,
+  },
+  searchInput: {
+    backgroundColor: '#333',
+    color: '#fff',
+    padding: 10,
+    borderRadius: 10,
+    marginTop: 20,
+  },
+  mapOption: {
+    color: '#00aaff',
+    marginTop: 20,
+    fontSize: 16,
+  },
   markerContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -870,7 +984,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 1000,
+    zIndex: 100,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between', // Distribuir el texto y el botón
@@ -907,6 +1021,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#333',
     padding: wp('3%'),
     borderRadius: 25,
+  },
+  panel: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#1C1C1E',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    // Ajusta la altura según sea necesario
+    height: '100%', // o un valor fijo como 300
+    zIndex: 100,
   },
   contenedorInput: {
     padding: wp('5%'),
