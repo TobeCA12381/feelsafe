@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { Dimensions, StatusBar, StyleSheet, View, TextInput, TouchableOpacity, Text, Image, Modal, ActivityIndicator, ScrollView, Share, Platform, Alert, SafeAreaView } from 'react-native';
+import { Dimensions, StatusBar, StyleSheet, View, TextInput, TouchableOpacity, Text, Image, Modal, ActivityIndicator, ScrollView, Share, Animated, Alert, SafeAreaView } from 'react-native';
 import MapView, { Marker, Polyline, Circle } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useNavigation } from '@react-navigation/native';
 import { GOOGLE_MAPS_APIKEY } from '@env';
-import {decodificarPolilinea, obtenerIconoMarcador, geocodificarInversoCoordenada, geocodificarDireccion, colorearRuta,RenderRuta } from '../utils/mapUtils';
+import { decodificarPolilinea, obtenerIconoMarcador, geocodificarInversoCoordenada, geocodificarDireccion, colorearRuta, RenderRuta } from '../utils/mapUtils';
 import { verificarSeguridadLogaritmica } from '../utils/routeSafety';
 import ViewShot from 'react-native-view-shot';
 import * as FileSystem from 'expo-file-system'; // Importamos expo-file-system para manejar archivos
@@ -38,7 +38,7 @@ export default function PantallaMapa() {
   const [zonaSeleccionada, setZonaSeleccionada] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [ubicacionActual, setUbicacionActual] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Nuevo estado para el estado de cargando
   const mapRef = useRef(null);
   const [mostrarIconoAlerta, setMostrarIconoAlerta] = useState(false);
   const [zonasPeligrosasEncontradas, setZonasPeligrosasEncontradas] = useState([]);
@@ -54,9 +54,17 @@ export default function PantallaMapa() {
     setModalPeligrosVisible(true);
   }, []);
 
+  const [isDragging, setIsDragging] = useState(false); // Controla si el mapa está siendo arrastrado
+  const [markerLocation, setMarkerLocation] = useState({
+    latitude: -11.985,
+    longitude: -77.005,
+  }); // Ubicación inicial del marcador
+
+  const fadeAnim = useRef(new Animated.Value(1)).current; // Controla la animación de los inputs
+
   const [compartirModalVisible, setCompartirModalVisible] = useState(false);
   const mapShotRef = useRef(null);
-
+  const markerAnim = useRef(new Animated.Value(0)).current;
   const zonasPeligrosas = useMemo(() => [
     { id: 1, latitude: -11.984, longitude: -77.007, descripcion: 'Zona de acoso', tipo: 'ACOSO', umbral: UMBRAL_PELIGRO_METROS, peso: 60 },
     { id: 2, latitude: -11.982, longitude: -77.003, descripcion: 'Zona de crimen violento', tipo: 'CRIMEN', umbral: UMBRAL_PELIGRO_METROS, peso: 90 },
@@ -67,16 +75,35 @@ export default function PantallaMapa() {
     { id: 7, latitude: -11.976, longitude: -77.008, descripcion: 'Zona de robos de vehículos', tipo: 'ROBO_A_VEHICULO', umbral: UMBRAL_PELIGRO_METROS, peso: 50 },
     { id: 8, latitude: -11.975, longitude: -77.009, descripcion: 'Área de actividad sospechosa', tipo: 'SOSPECHOSO', umbral: UMBRAL_PELIGRO_METROS, peso: 40 },
     { id: 9, latitude: -11.974, longitude: -77.010, descripcion: 'Zona de vandalismo', tipo: 'VANDALISMO', umbral: UMBRAL_PELIGRO_METROS, peso: 30 },
-  
+
   ], []);
-
-
+  const markerAnimatedValue = useRef(new Animated.Value(0)).current;
+  const [markerCoordinate, setMarkerCoordinate] = useState({
+    latitude: -11.985,
+    longitude: -77.005,
+  });
 
   useEffect(() => {
     // Inicia la verificación constante del estado del GPS
     startCheckingGpsStatus();
     return () => clearInterval(gpsCheckInterval); // Limpia el intervalo cuando el componente se desmonte
   }, []);
+
+  useEffect(() => {
+    if (isDragging) {
+      Animated.timing(fadeAnim, {
+        toValue: 0, // Ocultar inputs
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(fadeAnim, {
+        toValue: 1, // Mostrar inputs
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [isDragging]);
 
   // Variable para almacenar el intervalo de verificación
   let gpsCheckInterval = null;
@@ -98,6 +125,9 @@ export default function PantallaMapa() {
     setGpsEnabled(enabled);
   };
 
+
+
+
   const handleEnableLocation = () => {
     Alert.alert(
       "Habilitar ubicación",
@@ -116,7 +146,6 @@ export default function PantallaMapa() {
       longitude: coordenada.longitude,
     }));
   }, []);
-
 
 
 
@@ -142,7 +171,7 @@ export default function PantallaMapa() {
 
         const puntosDecodificados = decodificarPolilinea(ruta.overview_polyline.points);
         if (!puntosDecodificados || puntosDecodificados.length === 0) {
-            throw new Error('Puntos decodificados inválidos.');
+          throw new Error('Puntos decodificados inválidos.');
         }
         //console.log('Puntos decodificados:', puntosDecodificados);
         setCoordenadasRuta(puntosDecodificados);
@@ -175,10 +204,6 @@ export default function PantallaMapa() {
 
 
 
-
-
-
-
   const agruparZonasPorTipo = useCallback((zonas) => {
     return zonas.reduce((acumulador, zona) => {
       const tipo = zona.tipo || 'DESCONOCIDO';
@@ -201,6 +226,69 @@ export default function PantallaMapa() {
   }, [navigation]);
 
 
+  const onRegionChange = useCallback(() => {
+    // Animate the marker to "lift"
+    Animated.spring(markerAnimatedValue, {
+      toValue: 1,
+      friction: 5,  // Más natural
+      useNativeDriver: true,
+    }).start();
+
+    setIsDragging(true);  // El usuario está arrastrando el mapa
+
+    // Solo anima si fadeAnim no es 0 (para evitar animaciones redundantes)
+    if (fadeAnim._value !== 0) {
+      Animated.timing(fadeAnim, {
+        toValue: 0,  // Ocultar
+        duration: 10,  // Aumenta la duración para una transición más suave
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [fadeAnim, markerAnimatedValue]);
+
+  const onRegionChangeComplete = useCallback((region) => {
+    setRegionMapa(region);
+    setMarkerCoordinate({
+      latitude: region.latitude,
+      longitude: region.longitude,
+    });
+
+    // Animate the marker to "land"
+    Animated.spring(markerAnimatedValue, {
+      toValue: 0,
+      friction: 5,  // Valor más equilibrado para una animación más natural
+      duration: 1,
+      useNativeDriver: true,
+    }).start();
+
+    // Actualiza el campo de entrada con la nueva dirección
+    geocodificarInversoCoordenada(region, (direccion) => {
+      if (seleccionandoOrigen) {
+        setInputOrigen(direccion);
+        setOrigen({
+          latitude: region.latitude,
+          longitude: region.longitude,
+        });
+      } else {
+        setInputDestino(direccion);
+        setDestino({
+          latitude: region.latitude,
+          longitude: region.longitude,
+        });
+      }
+    });
+
+    setIsDragging(false);  // El usuario dejó de arrastrar
+
+    // Solo anima si fadeAnim no es 1 (para evitar animaciones redundantes)
+    if (fadeAnim._value !== 1) {
+      Animated.timing(fadeAnim, {
+        toValue: 1,  // Mostrar
+        duration: 7,  // Aumenta la duración para una transición más suave
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [seleccionandoOrigen, geocodificarInversoCoordenada, fadeAnim, markerAnimatedValue]);
 
   useEffect(() => {
     if (origen && destino) {
@@ -292,6 +380,8 @@ export default function PantallaMapa() {
     }
   }, []);
 
+
+
   const obtenerUbicacionActual = useCallback(async () => {
     setLoading(true);
 
@@ -354,32 +444,59 @@ export default function PantallaMapa() {
     }
   }, [actualizarRegionMapa, geocodificarDireccion]);
 
+
+
   const manejarPresionMapa = useCallback((e) => {
     const { latitude, longitude } = e.nativeEvent.coordinate;
     const coordenada = { latitude, longitude };
+
+    iniciarAnimacionSalto(); // Inicia la animación cuando el marcador se está moviendo
+
+    setLoading(true);
     actualizarRegionMapa(coordenada);
+
     if (seleccionandoOrigen) {
       setOrigen(coordenada);
-      geocodificarInversoCoordenada(coordenada, setInputOrigen);
+      geocodificarInversoCoordenada(coordenada, (direccion) => {
+        setInputOrigen(direccion);
+        setLoading(false);
+        finalizarAnimacionSalto(); // Finaliza la animación cuando se detiene
+      });
     } else {
       setDestino(coordenada);
-      geocodificarInversoCoordenada(coordenada, setInputDestino);
+      geocodificarInversoCoordenada(coordenada, (direccion) => {
+        setInputDestino(direccion);
+        setLoading(false);
+        finalizarAnimacionSalto(); // Finaliza la animación cuando se detiene
+      });
     }
   }, [seleccionandoOrigen, actualizarRegionMapa, geocodificarInversoCoordenada]);
 
- 
+  // Función para iniciar la animación de salto
+  const iniciarAnimacionSalto = () => {
+    Animated.spring(markerAnim, {
+      toValue: 1,
+      friction: 5,
+      tension: 40,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const finalizarAnimacionSalto = () => {
+    Animated.spring(markerAnim, {
+      toValue: 0,
+      friction: 5,
+      tension: 40,
+      useNativeDriver: true,
+    }).start();
+  };
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
-      {/* StatusBar to control the appearance of the status bar */}
       <StatusBar barStyle="light-content" backgroundColor="#333" />
-
-      {/* Top bar overlay */}
       <View style={styles.topBar} />
-
       <ViewShot ref={mapShotRef} options={{ format: "jpg", quality: 0.8, result: "tmpfile" }} style={StyleSheet.absoluteFillObject}>
         <View style={styles.contenedor}>
-          {/* Notificación para habilitar GPS */}
           {!gpsEnabled && (
             <TouchableOpacity style={styles.gpsNotification} onPress={handleEnableLocation}>
               <Text style={styles.gpsNotificationText}>
@@ -392,36 +509,20 @@ export default function PantallaMapa() {
             ref={mapRef}
             style={styles.mapa}
             region={regionMapa}
-            onRegionChangeComplete={setRegionMapa}
-            onPress={manejarPresionMapa}
+            onRegionChange={onRegionChange}
+            onRegionChangeComplete={onRegionChangeComplete}
           >
             <RenderRuta coordenadasRuta={coordenadasRuta} zonasPeligrosas={zonasPeligrosas} />
-            {coordenadasRuta.map((segmento, index) => {
-              if (!segmento || !Array.isArray(segmento.coordenadas)) {
-                //console.error('Segmento inválido o sin coordenadas:', segmento);
-                return null; // No renderizar este segmento
-              }
-
-              // Verifica que las coordenadas sean válidas
-              const coordenadasValidas = segmento.coordenadas.every(coord => coord && typeof coord.latitude === 'number' && typeof coord.longitude === 'number');
-
-              if (!coordenadasValidas) {
-                console.error('Coordenadas inválidas para el segmento:', segmento);
-                return null; // No renderizar este segmento
-              }
-
-            })}
-
-
 
             {origen && (
-              <Marker
-                coordinate={origen}
-                title="Origen"
-                draggable
-                onDragEnd={(e) => manejarFinArrastreMarcador(e.nativeEvent.coordinate, setOrigen, setInputOrigen)}
-              />
+              <Marker coordinate={origen} anchor={{ x: 0.5, y: 1 }}>
+                <Image
+                  source={require('../assets/inicio.png')}
+                  style={styles.markerImage}
+                />
+              </Marker>
             )}
+
             {destino && (
               <Marker
                 coordinate={destino}
@@ -430,57 +531,58 @@ export default function PantallaMapa() {
                 onDragEnd={(e) => manejarFinArrastreMarcador(e.nativeEvent.coordinate, setDestino, setInputDestino)}
               />
             )}
-            {colorearRuta(coordenadasRuta, zonasPeligrosas).map((segmento, index) => {
-              if (!segmento || !Array.isArray(segmento.coordenadas) || segmento.coordenadas.length < 2) {
-                //console.error('Segmento inválido o sin coordenadas suficientes:', segmento);
-                return null; // No renderizar este segmento
-              }
 
-              return (
-                <Polyline
-                  key={index}
-                  coordinates={segmento.coordenadas}
-                  strokeColor={segmento.color}
-                  strokeWidth={3}
-                />
-              );
-            })}
-            {zonasPeligrosas.map((zona) => (
-              <Marker
-                key={zona.id}
-                coordinate={{ latitude: zona.latitude, longitude: zona.longitude }}
-                title={zona.descripcion}
-                onPress={() => manejarPresionMarcador(zona)}
-              >
-                <Image
-                  source={obtenerIconoMarcador(zona.tipo)}
-                  style={{ width: 40, height: 40 }}
-                />
-              </Marker>
-            ))}
-            {zonasPeligrosas.map((zona) => (
-              <Circle
-                key={`${zona.id}-circle`}
-                center={{ latitude: zona.latitude, longitude: zona.longitude }}
-                radius={zona.umbral}
-                strokeWidth={2}
-                strokeColor="rgba(255, 0, 0, 0.5)"
-                fillColor="rgba(255, 0, 0, 0.2)"
+            {colorearRuta(coordenadasRuta, zonasPeligrosas).map((segmento, index) => (
+              <Polyline
+                key={index}
+                coordinates={segmento.coordenadas}
+                strokeColor={segmento.color}
+                strokeWidth={3}
               />
+            ))}
+
+            {zonasPeligrosas.map((zona) => (
+              <React.Fragment key={zona.id}>
+                <Marker
+                  coordinate={{ latitude: zona.latitude, longitude: zona.longitude }}
+                  title={zona.descripcion}
+                  onPress={() => manejarPresionMarcador(zona)}
+                >
+                  <Image
+                    source={obtenerIconoMarcador(zona.tipo)}
+                    style={{ width: 40, height: 40 }}
+                  />
+                </Marker>
+                <Circle
+                  center={{ latitude: zona.latitude, longitude: zona.longitude }}
+                  radius={zona.umbral}
+                  strokeWidth={2}
+                  strokeColor="rgba(255, 0, 0, 0.5)"
+                  fillColor="rgba(255, 0, 0, 0.2)"
+                />
+              </React.Fragment>
             ))}
           </MapView>
 
 
-          {/* Coloca el indicador de seguridad fuera del MapView */}
-          <TouchableOpacity
-            style={[styles.indicadorSeguridad, { backgroundColor: seguridadRuta === 'peligroso' ? '#FFCCCC' : seguridadRuta === 'moderado' ? '#FFF5CC' : '#CCFFCC', borderWidth: 1, borderColor: 'blue', position: 'absolute', bottom: 240, left: '5%', right: '5%', zIndex: 10 }]}
-            onPress={abrirModalPeligros}
-          >
-            <Text style={{ color: seguridadRuta === 'peligroso' ? '#FF0000' : seguridadRuta === 'moderado' ? '#FFA500' : '#00FF00', fontSize: 16, fontWeight: 'bold' }}>
-              Nivel de seguridad: {seguridadRuta}
-            </Text>
-            <Text style={{ fontSize: 14 }}>Puntuación de seguridad: {puntuacionSeguridad}</Text>
-          </TouchableOpacity>
+          {/* Fixed center marker */}
+          <View style={styles.markerFixed}>
+            <Animated.Image
+              source={require('../assets/inicio.png')}
+              style={[
+                styles.marker,
+                {
+                  transform: [{
+                    translateY: markerAnimatedValue.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, -10],
+                    }),
+                  }],
+                },
+              ]}
+            />
+          </View>
+
           <Modal
             animationType="slide"
             transparent={true}
@@ -535,32 +637,48 @@ export default function PantallaMapa() {
             </View>
           </Modal>
 
-          <View style={[styles.topButtonsContainer, !gpsEnabled && styles.topButtonsContainerWithNotification]}>
-            {/* Botón flotante del menú lateral */}
-            <TouchableOpacity style={styles.botonMenu} onPress={abrirMenuLateral}>
-              <Ionicons name="menu" size={30} color="#FFF" />
-              {/* Envuelve el texto en un componente <Text> */}
+          <View style={[styles.topButtonsContainer]}>
+            {/* Contenedor separado para los botones que se moverán con la notificación */}
+            <View style={[styles.topButtonsMovable, !gpsEnabled && styles.topButtonsWithNotification]}>
+              <TouchableOpacity style={styles.botonMenu} onPress={abrirMenuLateral}>
+                <Ionicons name="menu" size={30} color="#FFF" />
+              </TouchableOpacity>
 
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.botonShare} onPress={abrirModalCompartir}>
+                <Ionicons name="share-social-outline" size={30} color="#FFF" />
+              </TouchableOpacity>
+            </View>
 
-            {/* Botón flotante de compartir */}
-            <TouchableOpacity style={styles.botonShare} onPress={abrirModalCompartir}>
-              <Ionicons name="share-social-outline" size={30} color="#FFF" />
-              {/* Envuelve el texto en un componente <Text> */}
-
+            {/* Botón GPS que no se moverá con la notificación */}
+            <TouchableOpacity
+              style={styles.botonGPS}
+              onPress={obtenerUbicacionActual}
+            >
+              <Ionicons name="navigate" size={30} color="#FFF" />
             </TouchableOpacity>
           </View>
 
 
-          {/* Botón flotante para el GPS */}
-          <TouchableOpacity
-            style={styles.botonGPS}
-            onPress={obtenerUbicacionActual}
-          >
-            <Ionicons name="navigate" size={30} color="#FFF" />
-          </TouchableOpacity>
+          <View style={[styles.contenedorInput]}>
+            <TouchableOpacity
+              style={[styles.indicadorSeguridad, {
+                backgroundColor: seguridadRuta === 'peligroso' ? '#FFCCCC' : seguridadRuta === 'moderado' ? '#FFF5CC' : '#CCFFCC',
+                borderWidth: 1,
+                borderColor: 'blue',
+                position: 'absolute',
+                bottom: 240,
+                left: '5%',
+                right: '5%',
+                zIndex: 10
+              }]}
+              onPress={abrirModalPeligros}
+            >
+              <Text style={{ color: seguridadRuta === 'peligroso' ? '#FF0000' : seguridadRuta === 'moderado' ? '#FFA500' : '#00FF00', fontSize: 16, fontWeight: 'bold' }}>
+                Nivel de seguridad: {seguridadRuta}
+              </Text>
+              <Text style={{ fontSize: 14 }}>Puntuación de seguridad: {puntuacionSeguridad}</Text>
+            </TouchableOpacity>
 
-          <View style={styles.contenedorInput}>
             <TextInput
               style={styles.input}
               placeholder="¿Dónde estamos?"
@@ -576,11 +694,9 @@ export default function PantallaMapa() {
               onFocus={() => setSeleccionandoOrigen(false)}
             />
           </View>
-
         </View>
-
       </ViewShot>
-    </SafeAreaView >
+    </SafeAreaView>
   );
 
 
@@ -590,6 +706,38 @@ export default function PantallaMapa() {
 
 
 const styles = StyleSheet.create({
+  markerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 40,
+    height: 40,
+  },
+  markerImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'contain',
+  },
+  loadingMarker: {
+    width: 40,
+    height: 40,
+    borderRadius: 20, // Hacerlo redondo
+    backgroundColor: '#2196F3', // Color de fondo para el estado de carga
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadedMarker: {
+    width: 40,
+    height: 40,
+    borderRadius: 20, // Hacerlo redondo
+    backgroundColor: '#4CAF50', // Cambiar el color cuando se cargue
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  markerText: {
+    color: '#fff',
+    fontSize: 10,
+    textAlign: 'center',
+  },
   topBar: {
     height: 3,
     backgroundColor: '#333',
@@ -602,16 +750,22 @@ const styles = StyleSheet.create({
   // Añade el contenedor de los botones superiores
   topButtonsContainer: {
     position: 'absolute',
-    top: hp('2%'), // Posición normal
+    top: hp('2%'), // Posición base
     left: 0,
     right: 0,
     zIndex: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: wp('3%'),
-  }, // Ajusta el contenedor cuando la notificación esté visible
-  topButtonsContainerWithNotification: {
-    top: hp('9%'), // Empuja hacia abajo los botones cuando la notificación esté visible
+  },
+  // Nuevo contenedor para los botones de menú y compartir
+  topButtonsMovable: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: wp('50%'),  // Asegura que solo los botones de menú y compartir estén en este contenedor
+  },
+  topButtonsWithNotification: {
+    top: hp('9%'),  // Ajusta la posición solo cuando la notificación esté visible
   },
   modalView: {
     margin: wp('5%'),
@@ -682,6 +836,17 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: hp('2%'),
   },
+  markerFixed: {
+    left: '50%',
+    marginLeft: -24,
+    marginTop: -48,
+    position: 'absolute',
+    top: '50%',
+  },
+  marker: {
+    height: 48,
+    width: 48,
+  },
   closeButton: {
     backgroundColor: '#2196F3',
     borderRadius: 20,
@@ -720,7 +885,7 @@ const styles = StyleSheet.create({
   },
   mapa: {
     width: wp('100%'),
-    height: hp('58%'),
+    height: hp('60%'),
   },
   botonMenu: {
     backgroundColor: '#333',
@@ -729,12 +894,14 @@ const styles = StyleSheet.create({
   },
   botonShare: {
     backgroundColor: '#333',
+    right: wp('-45%'),
     padding: wp('3%'),
     borderRadius: 25,
   },
+  // Mantiene el botón GPS fijo
   botonGPS: {
     position: 'absolute',
-    top: hp('50%'), // Usamos porcentaje relativo
+    top: hp('48%'), // No será afectado por la notificación
     right: wp('5%'),
     zIndex: 1,
     backgroundColor: '#333',
