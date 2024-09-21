@@ -84,6 +84,7 @@ export default function PantallaMapa() {
     latitude: -11.985,
     longitude: -77.005,
   });
+  const [rutaGenerada, setRutaGenerada] = useState(false); // Controla si la ruta ya fue generada
 
   useEffect(() => {
     // Inicia la verificación constante del estado del GPS
@@ -91,25 +92,20 @@ export default function PantallaMapa() {
     return () => clearInterval(gpsCheckInterval); // Limpia el intervalo cuando el componente se desmonte
   }, []);
 
-
   const manejarCambioInputDesdePanel = useCallback(async (texto, esOrigen) => {
     try {
       if (texto) {
+        // Geocodificar la dirección ingresada para obtener las coordenadas
         const coordenada = await geocodificarDireccion(texto);
         if (coordenada) {
           if (esOrigen) {
+            // Actualizamos el origen con las nuevas coordenadas
             setOrigen(coordenada);
-            setInputOrigen(texto);
-            actualizarRegionMapa(coordenada);
+            setInputOrigen(texto); // Actualizamos el input también
           } else {
+            // Actualizamos el destino con las nuevas coordenadas
             setDestino(coordenada);
-            setInputDestino(texto);
-            actualizarRegionMapa(coordenada);
-          }
-  
-          // Si ya tenemos origen y destino, genera la ruta automáticamente
-          if (origen && destino) {
-            obtenerRuta();
+            setInputDestino(texto); // Actualizamos el input también
           }
         } else {
           Alert.alert("No se encontraron coordenadas para la dirección ingresada");
@@ -118,9 +114,8 @@ export default function PantallaMapa() {
     } catch (error) {
       console.error("Error al geocodificar la dirección:", error);
     }
-  }, [origen, destino, actualizarRegionMapa, obtenerRuta, geocodificarDireccion]);
+  }, []);
   
-
 
 
   // Variable para almacenar el intervalo de verificación
@@ -144,22 +139,35 @@ export default function PantallaMapa() {
   };
 
   const openPanel = () => {
+    // Limpiar la ruta actual al abrir el panel
+    setCoordenadasRuta([]);
+    setRutaGenerada(false); // Resetea la bandera de ruta generada
     setIsPanelOpen(true);
+  
     Animated.timing(slideAnim, {
       toValue: 1,
       duration: 300,
       useNativeDriver: true,
     }).start();
   };
+  
 
+  // Función para cerrar el panel y verificar si las coordenadas han cambiado
   const closePanel = () => {
     Animated.timing(slideAnim, {
       toValue: 0,
       duration: 300,
       useNativeDriver: true,
-    }).start(() => setIsPanelOpen(false));
+    }).start(() => {
+      setIsPanelOpen(false);
+  
+      // Si el origen y el destino están definidos, generar la nueva ruta
+      if (origen && destino) {
+        obtenerRuta();  // Genera una nueva ruta
+      }
+    });
   };
-
+  
   const panelTranslateY = slideAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [height, 0], // El panel se desliza desde abajo hacia arriba
@@ -185,8 +193,6 @@ export default function PantallaMapa() {
     }));
   }, []);
 
-
-
   const obtenerRuta = useCallback(async () => {
     if (!origen || !destino) {
       Alert.alert('Error', 'Debe seleccionar un origen y un destino');
@@ -211,7 +217,7 @@ export default function PantallaMapa() {
         if (!puntosDecodificados || puntosDecodificados.length === 0) {
           throw new Error('Puntos decodificados inválidos.');
         }
-        //console.log('Puntos decodificados:', puntosDecodificados);
+
         setCoordenadasRuta(puntosDecodificados);
 
         const { puntosPeligrosos, puntuacion } = verificarSeguridadLogaritmica(puntosDecodificados, zonasPeligrosas);
@@ -228,8 +234,12 @@ export default function PantallaMapa() {
         }
 
         ajustarVistaRuta(puntosDecodificados);
+
+        // Aquí desactivamos la animación de los marcadores y los fijamos
+        setRutaGenerada(true); // Marcar que la ruta ha sido generada
+
       } else {
-        throw new Error('No se encontraron rutas. Por favor, verifique las ubicaciones e intente de nuevo.');
+        throw new Error('No se encontraron rutas. Verifique las ubicaciones.');
       }
     } catch (error) {
       console.error('Error al obtener la ruta:', error);
@@ -242,6 +252,8 @@ export default function PantallaMapa() {
 
 
 
+
+
   const agruparZonasPorTipo = useCallback((zonas) => {
     return zonas.reduce((acumulador, zona) => {
       const tipo = zona.tipo || 'DESCONOCIDO';
@@ -250,14 +262,15 @@ export default function PantallaMapa() {
     }, {});
   }, []);
 
-  const ajustarVistaRuta = useCallback((coordenadas) => {
-    if (mapRef.current && coordenadas.length > 0) {
-      mapRef.current.fitToCoordinates(coordenadas, {
-        edgePadding: { top: 30, right: 30, bottom: 30, left: 30 },  // Reducir el padding para acercar más
+  const ajustarVistaRuta = useCallback((puntos) => {
+    if (mapRef.current && puntos.length > 0) {
+      mapRef.current.fitToCoordinates(puntos, {
+        edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
         animated: true,
       });
     }
   }, []);
+
 
   const abrirMenuLateral = useCallback(() => {
     navigation.openDrawer();
@@ -265,68 +278,52 @@ export default function PantallaMapa() {
 
 
   const onRegionChange = useCallback(() => {
-    // Animate the marker to "lift"
-    Animated.spring(markerAnimatedValue, {
-      toValue: 1,
-      friction: 5,  // Más natural
-      useNativeDriver: true,
-    }).start();
-
-    setIsDragging(true);  // El usuario está arrastrando el mapa
-
-    // Solo anima si fadeAnim no es 0 (para evitar animaciones redundantes)
-    if (fadeAnim._value !== 0) {
-      Animated.timing(fadeAnim, {
-        toValue: 0,  // Ocultar
-        duration: 10,  // Aumenta la duración para una transición más suave
+    if (!rutaGenerada) { // Solo animar si la ruta no está generada
+      Animated.spring(markerAnimatedValue, {
+        toValue: 1,
+        friction: 5,  // Más natural
         useNativeDriver: true,
       }).start();
+
+      setIsDragging(true);  // El usuario está arrastrando el mapa
+
+      if (fadeAnim._value !== 0) {
+        Animated.timing(fadeAnim, {
+          toValue: 0,  // Ocultar
+          duration: 10,  // Aumenta la duración para una transición más suave
+          useNativeDriver: true,
+        }).start();
+      }
     }
-  }, [fadeAnim, markerAnimatedValue]);
+  }, [rutaGenerada, fadeAnim, markerAnimatedValue]);
 
   const onRegionChangeComplete = useCallback((region) => {
-    setRegionMapa(region);
-    setMarkerCoordinate({
-      latitude: region.latitude,
-      longitude: region.longitude,
-    });
+    if (!rutaGenerada) { // Evitar cambios si la ruta ya fue generada
+      setRegionMapa(region);
+      setMarkerCoordinate({
+        latitude: region.latitude,
+        longitude: region.longitude,
+      });
 
-    // Animate the marker to "land"
-    Animated.spring(markerAnimatedValue, {
-      toValue: 0,
-      friction: 5,  // Valor más equilibrado para una animación más natural
-      duration: 1,
-      useNativeDriver: true,
-    }).start();
-
-    // Actualiza el campo de entrada con la nueva dirección
-    geocodificarInversoCoordenada(region, (direccion) => {
-      if (seleccionandoOrigen) {
-        setInputOrigen(direccion);
-        setOrigen({
-          latitude: region.latitude,
-          longitude: region.longitude,
-        });
-      } else {
-        setInputDestino(direccion);
-        setDestino({
-          latitude: region.latitude,
-          longitude: region.longitude,
-        });
-      }
-    });
-
-    setIsDragging(false);  // El usuario dejó de arrastrar
-
-    // Solo anima si fadeAnim no es 1 (para evitar animaciones redundantes)
-    if (fadeAnim._value !== 1) {
-      Animated.timing(fadeAnim, {
-        toValue: 1,  // Mostrar
-        duration: 3,  // Aumenta la duración para una transición más suave
-        useNativeDriver: true,
-      }).start();
+      // Actualiza el campo de entrada con la nueva dirección
+      geocodificarInversoCoordenada(region, (direccion) => {
+        if (seleccionandoOrigen) {
+          setInputOrigen(direccion);
+          setOrigen({
+            latitude: region.latitude,
+            longitude: region.longitude,
+          });
+        } else {
+          setInputDestino(direccion);
+          setDestino({
+            latitude: region.latitude,
+            longitude: region.longitude,
+          });
+        }
+      });
     }
-  }, [seleccionandoOrigen, geocodificarInversoCoordenada, fadeAnim, markerAnimatedValue]);
+  }, [seleccionandoOrigen, geocodificarInversoCoordenada, rutaGenerada]);
+
 
   useEffect(() => {
     if (origen && destino) {
@@ -487,31 +484,31 @@ export default function PantallaMapa() {
   const manejarPresionMapa = useCallback((e) => {
     const { latitude, longitude } = e.nativeEvent.coordinate;
     const coordenada = { latitude, longitude };
-  
+
     if (!destino) {  // Solo permite mover el marcador si el destino aún no se ha establecido
-      iniciarAnimacionSalto(); 
-  
+      iniciarAnimacionSalto();
+
       setLoading(true);
       actualizarRegionMapa(coordenada);
-  
+
       if (seleccionandoOrigen) {
         setOrigen(coordenada);
         geocodificarInversoCoordenada(coordenada, (direccion) => {
           setInputOrigen(direccion);
           setLoading(false);
-          finalizarAnimacionSalto(); 
+          finalizarAnimacionSalto();
         });
       } else {
         setDestino(coordenada);
         geocodificarInversoCoordenada(coordenada, (direccion) => {
           setInputDestino(direccion);
           setLoading(false);
-          finalizarAnimacionSalto(); 
+          finalizarAnimacionSalto();
         });
       }
     }
   }, [seleccionandoOrigen, actualizarRegionMapa, geocodificarInversoCoordenada, destino]);
-  
+
 
   const iniciarAnimacionSalto = useCallback(() => {
     if (!destino) { // Solo realiza la animación si el destino no ha sido seleccionado
@@ -523,7 +520,7 @@ export default function PantallaMapa() {
       }).start();
     }
   }, [destino]);
-  
+
   const finalizarAnimacionSalto = useCallback(() => {
     if (!destino) { // Solo finaliza la animación si el destino no ha sido seleccionado
       Animated.spring(markerAnim, {
@@ -534,7 +531,7 @@ export default function PantallaMapa() {
       }).start();
     }
   }, [destino]);
-  
+
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
@@ -549,84 +546,70 @@ export default function PantallaMapa() {
               </Text>
             </TouchableOpacity>
           )}
+<MapView
+  ref={mapRef}
+  style={styles.mapa}
+  region={regionMapa}
+  onRegionChange={!rutaGenerada ? onRegionChange : undefined} // Desactivar movimientos cuando la ruta está generada
+  onRegionChangeComplete={!rutaGenerada ? onRegionChangeComplete : undefined}
+>
+  <RenderRuta coordenadasRuta={coordenadasRuta} zonasPeligrosas={zonasPeligrosas} />
 
-          <MapView
-            ref={mapRef}
-            style={styles.mapa}
-            region={regionMapa} // Actualizamos el estado `regionMapa` con las nuevas coordenadas
-            onRegionChange={onRegionChange}
-            onRegionChangeComplete={onRegionChangeComplete}
-          >
-            <RenderRuta coordenadasRuta={coordenadasRuta} zonasPeligrosas={zonasPeligrosas} />
+  {/* Mostrar el marcador de inicio */}
+  {origen && (
+    <Marker coordinate={origen} anchor={{ x: 0.5, y: 1 }} draggable={false}>
+      <Image
+        source={require('../assets/inicio.png')}
+        style={styles.markerImage}
+      />
+    </Marker>
+  )}
 
-            {origen && (
-              <Marker coordinate={origen} anchor={{ x: 0.5, y: 1 }}>
-                <Image
-                  source={require('../assets/inicio.png')}
-                  style={styles.markerImage}
-                />
-              </Marker>
-            )}
+  {/* Mostrar el marcador de destino */}
+  {destino && (
+    <Marker coordinate={destino} anchor={{ x: 0.5, y: 1 }} draggable={false}>
+      <Image
+        source={require('../assets/destino.png')}
+        style={styles.markerImage}
+      />
+    </Marker>
+  )}
 
-            {destino && (
-              <Marker
-                coordinate={destino}
-                title="Destino"
-                draggable
-                onDragEnd={(e) => manejarFinArrastreMarcador(e.nativeEvent.coordinate, setDestino, setInputDestino)}
+  {colorearRuta(coordenadasRuta, zonasPeligrosas).map((segmento, index) => (
+    <Polyline
+      key={index}
+      coordinates={segmento.coordenadas}
+      strokeColor={segmento.color}
+      strokeWidth={3}
+    />
+  ))}
+</MapView>
+
+
+
+
+
+
+
+
+          {!rutaGenerada && (
+            <View style={styles.markerFixed}>
+              <Animated.Image
+                source={require('../assets/inicio.png')}
+                style={[
+                  styles.marker,
+                  {
+                    transform: [{
+                      translateY: markerAnimatedValue.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, -10],
+                      }),
+                    }],
+                  },
+                ]}
               />
-            )}
-
-            {colorearRuta(coordenadasRuta, zonasPeligrosas).map((segmento, index) => (
-              <Polyline
-                key={index}
-                coordinates={segmento.coordenadas}
-                strokeColor={segmento.color}
-                strokeWidth={3}
-              />
-            ))}
-
-            {zonasPeligrosas.map((zona) => (
-              <React.Fragment key={zona.id}>
-                <Marker
-                  coordinate={{ latitude: zona.latitude, longitude: zona.longitude }}
-                  title={zona.descripcion}
-                  onPress={() => manejarPresionMarcador(zona)}
-                >
-                  <Image
-                    source={obtenerIconoMarcador(zona.tipo)}
-                    style={{ width: 40, height: 40 }}
-                  />
-                </Marker>
-                <Circle
-                  center={{ latitude: zona.latitude, longitude: zona.longitude }}
-                  radius={zona.umbral}
-                  strokeWidth={2}
-                  strokeColor="rgba(255, 0, 0, 0.5)"
-                  fillColor="rgba(255, 0, 0, 0.2)"
-                />
-              </React.Fragment>
-            ))}
-          </MapView>
-
-
-          {/* Fixed center marker */}
-          <View style={styles.markerFixed}>
-            <Animated.Image
-              source={require('../assets/inicio.png')}
-              style={[
-                styles.marker,
-                {
-                  transform: [{
-                    translateY: markerAnimatedValue.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, -10],
-                    }),
-                  }],
-                },
-              ]}
-            />
-          </View>
+            </View>
+          )}
 
           <Modal
             animationType="slide"
@@ -751,18 +734,16 @@ export default function PantallaMapa() {
 
             </View>
           </View>
-          {/* Panel deslizante */}
+          {/* Panel de entrada de ruta */}
           {isPanelOpen && (
             <Animated.View style={[styles.panel, { transform: [{ translateY: panelTranslateY }] }]}>
               <RouteInputPanel
                 onClose={closePanel} // Cierra el panel
-                setOrigenInput={(texto) => manejarCambioInputDesdePanel(texto, true)} // Llama a la función para actualizar el origen
-                setDestinoInput={(texto) => manejarCambioInputDesdePanel(texto, false)} // Llama a la función para actualizar el destino
-                origenValue={inputOrigen} // Pasa el valor actual del origen
-                destinoValue={inputDestino} // Pasa el valor actual del destino
+                setOrigenInput={(texto) => manejarCambioInputDesdePanel(texto, true)} // Actualiza origen
+                setDestinoInput={(texto) => manejarCambioInputDesdePanel(texto, false)} // Actualiza destino
+                origenValue={inputOrigen}
+                destinoValue={inputDestino}
               />
-
-
             </Animated.View>
           )}
         </View>
@@ -827,9 +808,9 @@ const styles = StyleSheet.create({
     height: 40,
   },
   markerImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'contain',
+    width: 30,
+    height: 40,
+    resizeMode: 'contain', // Asegúrate de que la imagen se ajuste bien
   },
   loadingMarker: {
     width: 40,
