@@ -11,6 +11,9 @@ import UserCard from './Vistas/UserCard';
 import Configuracion from './Vistas/Configuracion';
 import Seguridad from './Vistas/Seguridad';
 import Soporte from './Vistas/Soporte';
+import ContactosEmergencia from './Vistas/ContactosEmergencia';
+import Chat from './Vistas/Chat';
+import Ayuda from './Vistas/Ayuda';
 import CustomDrawerContent from './Componentes/CustomDrawerContent';
 
 const Stack = createStackNavigator();
@@ -81,6 +84,26 @@ function DrawerNavigator() {
       <Drawer.Screen
         name="Soporte"
         component={withFloatingMenu(Soporte)}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Drawer.Screen
+        name="Chat"
+        component={withFloatingMenu(Chat)}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Drawer.Screen name="ContactosEmergencia" 
+      component={ContactosEmergencia}
+      options={{
+        headerShown: false,
+      }} />
+
+      <Drawer.Screen
+        name="Ayuda"
+        component={withFloatingMenu(Ayuda)}
         options={{
           headerShown: false,
         }}
