@@ -1,10 +1,29 @@
-import React from 'react';
-import { Text, StyleSheet, View, TextInput, Dimensions, TouchableOpacity, ImageBackground, Image } from 'react-native';
+import React, { useState } from 'react';
+import { Text, StyleSheet, View, TextInput, Dimensions, TouchableOpacity, ImageBackground, Image, Alert } from 'react-native';
 import { useFonts } from 'expo-font';
 import Boton from '../Componentes/Boton.js'; // Asegúrate de que la ruta sea correcta
 import { useNavigation } from '@react-navigation/native';
+import { initializeAuth, signInWithEmailAndPassword, getReactNativePersistence } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { initializeApp, getApps } from 'firebase/app';
+import { firebaseConfig } from '../firebase-config'; // Asegúrate de que la ruta sea correcta
+
+// Inicializa Firebase solo si no ha sido inicializado previamente
+let app;
+if (getApps().length === 0) {
+  app = initializeApp(firebaseConfig);
+} else {
+  app = getApps()[0];
+}
+
+// Configura la persistencia para Firebase Auth
+const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(AsyncStorage),
+});
 
 const App = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [fontsLoaded] = useFonts({
     Ultra: require("../fonts/Poppins-ExtraBold.ttf"),
   });
@@ -12,6 +31,36 @@ const App = () => {
   const navigation = useNavigation();
 
   if (!fontsLoaded) return null;
+
+  // Función de inicio de sesión con Firebase
+  const handleSignIn = () => {
+    signInWithEmailAndPassword(auth, email, password)
+      .then((userCredential) => {
+        console.log('Signed in!', userCredential.user);
+
+        // Redirigir a la vista DrawerScreens si el inicio de sesión es exitoso
+        navigation.navigate('DrawerScreens', { screen: 'DrawerScreens' });
+      })
+      .catch((error) => { let customMessage = '';
+
+        switch (error.code) {
+            case 'auth/invalid-email':
+                customMessage = 'El correo ingresado no es válido. Por favor, verifica e inténtalo de nuevo.';
+                break;
+            case 'auth/wrong-password':
+                customMessage = 'La contraseña es incorrecta. Por favor, intenta de nuevo.';
+                break;
+            case 'auth/user-not-found':
+                customMessage = 'No existe una cuenta con este correo.';
+                break;
+            default:
+                customMessage = 'Ha ocurrido un error. Por favor, inténtalo más tarde.';
+        }
+    
+        console.log(error);
+        Alert.alert('Error', customMessage);
+      });
+  };
 
   return (
     <ImageBackground source={require('../Imagenes/mesaTrabajo2.png')} style={styles.fondo}>
@@ -22,14 +71,25 @@ const App = () => {
         <Text style={styles.subtitle}>siéntete seguro</Text>
 
         <View style={styles.inputContainer}>
-          <TextInput placeholder='Ingresa Correo' style={styles.input} />
-          <TextInput placeholder='Ingresa contraseña' style={styles.input} secureTextEntry />
+          <TextInput
+            placeholder='Ingresa Correo'
+            style={styles.input}
+            value={email}
+            onChangeText={setEmail} // Captura el correo ingresado
+          />
+          <TextInput
+            placeholder='Ingresa contraseña'
+            style={styles.input}
+            secureTextEntry
+            value={password}
+            onChangeText={setPassword} // Captura la contraseña ingresada
+          />
         </View>
 
         <Boton
           text="Iniciar Sesión"
           style={styles.botoningresar}
-          onPress={() => navigation.navigate('DrawerScreens', { screen: 'Mapa' })}
+          onPress={handleSignIn} // Ejecuta la función de inicio de sesión
         />
 
         <View style={styles.socialLoginContainer}>
@@ -92,7 +152,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   input: {
-    width: '200', // Usando el 100% para responsividad
+    width: '100%',
     paddingHorizontal: 15,
     paddingVertical: 10,
     borderRadius: 25,
