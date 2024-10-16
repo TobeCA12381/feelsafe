@@ -115,7 +115,7 @@ export default function PantallaMapa() {
       console.error("Error al geocodificar la dirección:", error);
     }
   }, []);
-  
+
 
 
   // Variable para almacenar el intervalo de verificación
@@ -143,14 +143,14 @@ export default function PantallaMapa() {
     setCoordenadasRuta([]);
     setRutaGenerada(false); // Resetea la bandera de ruta generada
     setIsPanelOpen(true);
-  
+
     Animated.timing(slideAnim, {
       toValue: 1,
       duration: 300,
       useNativeDriver: true,
     }).start();
   };
-  
+
 
   // Función para cerrar el panel y verificar si las coordenadas han cambiado
   const closePanel = () => {
@@ -160,14 +160,14 @@ export default function PantallaMapa() {
       useNativeDriver: true,
     }).start(() => {
       setIsPanelOpen(false);
-  
+
       // Si el origen y el destino están definidos, generar la nueva ruta
       if (origen && destino) {
         obtenerRuta();  // Genera una nueva ruta
       }
     });
   };
-  
+
   const panelTranslateY = slideAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [height, 0], // El panel se desliza desde abajo hacia arriba
@@ -199,7 +199,10 @@ export default function PantallaMapa() {
       return;
     }
 
-    setLoading(true);
+    // Limpia la ruta anterior antes de calcular la nueva
+    setCoordenadasRuta([]); // <-- Agregamos esta línea para limpiar la ruta previa
+
+    setLoading(true); // Mostrar un indicador de carga mientras se genera la nueva ruta
 
     try {
       const urlDirecciones = `https://maps.googleapis.com/maps/api/directions/json?origin=${origen.latitude},${origen.longitude}&destination=${destino.latitude},${destino.longitude}&mode=${modoViaje}&key=${GOOGLE_MAPS_APIKEY}`;
@@ -214,11 +217,8 @@ export default function PantallaMapa() {
         }
 
         const puntosDecodificados = decodificarPolilinea(ruta.overview_polyline.points);
-        if (!puntosDecodificados || puntosDecodificados.length === 0) {
-          throw new Error('Puntos decodificados inválidos.');
-        }
 
-        setCoordenadasRuta(puntosDecodificados);
+        setCoordenadasRuta(puntosDecodificados); // <-- Aquí se actualizan las nuevas coordenadas de la ruta
 
         const { puntosPeligrosos, puntuacion } = verificarSeguridadLogaritmica(puntosDecodificados, zonasPeligrosas);
 
@@ -233,11 +233,9 @@ export default function PantallaMapa() {
           setMostrarIconoAlerta(false);
         }
 
-        ajustarVistaRuta(puntosDecodificados);
+        ajustarVistaRuta(puntosDecodificados); // <-- Aquí ajustas la vista del mapa a la nueva ruta
 
-        // Aquí desactivamos la animación de los marcadores y los fijamos
         setRutaGenerada(true); // Marcar que la ruta ha sido generada
-
       } else {
         throw new Error('No se encontraron rutas. Verifique las ubicaciones.');
       }
@@ -245,11 +243,9 @@ export default function PantallaMapa() {
       console.error('Error al obtener la ruta:', error);
       Alert.alert('Error', `Hubo un problema al generar la ruta: ${error.message}`);
     } finally {
-      setLoading(false);
+      setLoading(false); // Ocultar el indicador de carga cuando termine
     }
-  }, [origen, destino, modoViaje, zonasPeligrosas, ajustarVistaRuta]);
-
-
+  }, [origen, destino, modoViaje, zonasPeligrosas, setPuntuacionSeguridad]);
 
 
 
@@ -546,44 +542,44 @@ export default function PantallaMapa() {
               </Text>
             </TouchableOpacity>
           )}
-<MapView
-  ref={mapRef}
-  style={styles.mapa}
-  region={regionMapa}
-  onRegionChange={!rutaGenerada ? onRegionChange : undefined} // Desactivar movimientos cuando la ruta está generada
-  onRegionChangeComplete={!rutaGenerada ? onRegionChangeComplete : undefined}
->
-  <RenderRuta coordenadasRuta={coordenadasRuta} zonasPeligrosas={zonasPeligrosas} />
+          <MapView
+            ref={mapRef}
+            style={styles.mapa}
+            region={regionMapa}
+            onRegionChange={!rutaGenerada ? onRegionChange : undefined} // Desactivar movimientos cuando la ruta está generada
+            onRegionChangeComplete={!rutaGenerada ? onRegionChangeComplete : undefined}
+          >
+            <RenderRuta coordenadasRuta={coordenadasRuta} zonasPeligrosas={zonasPeligrosas} />
 
-  {/* Mostrar el marcador de inicio */}
-  {origen && (
-    <Marker coordinate={origen} anchor={{ x: 0.5, y: 1 }} draggable={false}>
-      <Image
-        source={require('../assets/inicio.png')}
-        style={styles.markerImage}
-      />
-    </Marker>
-  )}
+            {/* Mostrar el marcador de inicio */}
+            {origen && (
+              <Marker coordinate={origen} anchor={{ x: 0.5, y: 1 }} draggable={false}>
+                <Image
+                  source={require('../assets/inicio.png')}
+                  style={styles.markerImage}
+                />
+              </Marker>
+            )}
 
-  {/* Mostrar el marcador de destino */}
-  {destino && (
-    <Marker coordinate={destino} anchor={{ x: 0.5, y: 1 }} draggable={false}>
-      <Image
-        source={require('../assets/destino.png')}
-        style={styles.markerImage}
-      />
-    </Marker>
-  )}
+            {/* Mostrar el marcador de destino */}
+            {destino && (
+              <Marker coordinate={destino} anchor={{ x: 0.5, y: 1 }} draggable={false}>
+                <Image
+                  source={require('../assets/destino.png')}
+                  style={styles.markerImage}
+                />
+              </Marker>
+            )}
 
-  {colorearRuta(coordenadasRuta, zonasPeligrosas).map((segmento, index) => (
-    <Polyline
-      key={index}
-      coordinates={segmento.coordenadas}
-      strokeColor={segmento.color}
-      strokeWidth={3}
-    />
-  ))}
-</MapView>
+            {colorearRuta(coordenadasRuta, zonasPeligrosas).map((segmento, index) => (
+              <Polyline
+                key={index}
+                coordinates={segmento.coordenadas}
+                strokeColor={segmento.color}
+                strokeWidth={3}
+              />
+            ))}
+          </MapView>
 
 
 
@@ -932,15 +928,15 @@ const styles = StyleSheet.create({
     marginBottom: hp('2%'),
   },
   markerFixed: {
-    left: '50%',
+    left: '52.39%',
     marginLeft: -24,
     marginTop: -48,
     position: 'absolute',
-    top: '50%',
+    top: '35%',
   },
   marker: {
-    height: 48,
-    width: 48,
+    height: 30,
+    width: 30,
   },
   closeButton: {
     backgroundColor: '#2196F3',
