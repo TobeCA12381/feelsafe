@@ -1,21 +1,71 @@
 import React, { Component } from 'react';
-import { Text, StyleSheet, View, TextInput, TouchableOpacity, Image, KeyboardAvoidingView, Platform, ScrollView, ImageBackground } from 'react-native';
+import { Text, StyleSheet, View, TextInput, TouchableOpacity, Image, KeyboardAvoidingView, Platform, ScrollView, ImageBackground, Alert } from 'react-native';
 import CheckBox from 'react-native-checkbox';
+import { initializeAuth, createUserWithEmailAndPassword, getReactNativePersistence, getAuth } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { initializeApp, getApps } from 'firebase/app';
+import { firebaseConfig } from '../firebase-config';
+
+// Inicializa Firebase solo si no ha sido inicializado previamente
+let app;
+if (getApps().length === 0) {
+  app = initializeApp(firebaseConfig);
+} else {
+  app = getApps()[0]; // Si ya ha sido inicializado, usar la instancia existente
+}
+
+// Configura la persistencia para Firebase Auth
+const auth = getAuth(app); // Usar la instancia inicializada correctamente
 
 export default class Registrar extends Component {
   constructor(props) {
     super(props);
     this.state = {
       checked: false,
+      email: '',
+      password: '',
     };
+    this.handleCreateAccount = this.handleCreateAccount.bind(this); // Enlaza la función
+  }
+
+  handleCreateAccount() {
+    const { email, password } = this.state;
+    createUserWithEmailAndPassword(auth, email, password)
+      .then((userCredential) => {
+        console.log('Account created!');
+        const user = userCredential.user;
+        console.log(user);
+
+        // Redirigir a la vista Inicio.js
+        this.props.navigation.navigate('Login');
+      })
+      .catch((error) => { let customMessage = '';
+
+        switch (error.code) {
+            case 'auth/invalid-email':
+                customMessage = 'El correo ingresado no es válido. Por favor, verifica e inténtalo de nuevo.';
+                break;
+            case 'auth/wrong-password':
+                customMessage = 'La contraseña es incorrecta. Por favor, intenta de nuevo.';
+                break;
+            case 'auth/user-not-found':
+                customMessage = 'No existe una cuenta con este correo.';
+                break;
+            default:
+                customMessage = 'Ha ocurrido un error. Por favor, inténtalo más tarde.';
+        }
+    
+        console.log(error);
+        Alert.alert('Error', customMessage);
+      });
   }
 
   render() {
     return (
       <KeyboardAvoidingView
         style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
       >
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           {/* Header */}
@@ -34,8 +84,20 @@ export default class Registrar extends Component {
               <TextInput placeholder="Nombre" style={styles.input} placeholderTextColor="#B0B0B0" />
               <TextInput placeholder="Apellidos" style={styles.input} placeholderTextColor="#B0B0B0" />
               <TextInput placeholder="Teléfono" style={styles.input} placeholderTextColor="#B0B0B0" keyboardType="phone-pad" />
-              <TextInput placeholder="Correo" style={styles.input} placeholderTextColor="#B0B0B0" keyboardType="email-address" />
-              <TextInput placeholder="Fecha de Nacimiento" style={styles.input} placeholderTextColor="#B0B0B0" />
+              <TextInput
+                placeholder="Correo"
+                style={styles.input}
+                placeholderTextColor="#B0B0B0"
+                keyboardType="email-address"
+                onChangeText={(text) => this.setState({ email: text })}
+              />
+              <TextInput
+                placeholder="Contraseña"
+                style={styles.input}
+                placeholderTextColor="#B0B0B0"
+                secureTextEntry
+                onChangeText={(text) => this.setState({ password: text })}
+              />
 
               <View style={styles.checkboxContainer}>
                 <CheckBox
@@ -45,7 +107,7 @@ export default class Registrar extends Component {
                 <Text style={styles.checkboxText}>He leído y acepto los términos y políticas de privacidad</Text>
               </View>
 
-              <TouchableOpacity style={styles.button}>
+              <TouchableOpacity onPress={this.handleCreateAccount} style={styles.button}>
                 <Text style={styles.buttonText}>Confirmar</Text>
               </TouchableOpacity>
             </View>
@@ -87,8 +149,8 @@ const styles = StyleSheet.create({
     fontFamily: 'Ultra',
     fontSize: 10,
     color: 'black',
-    top:-15,
-    left:22,
+    top: -15,
+    left: 22,
   },
   logo: {
     width: 100,
@@ -101,12 +163,12 @@ const styles = StyleSheet.create({
     padding: 20,
     marginHorizontal: 45,
     alignItems: 'center',
-    top:-20,
+    top: -20,
   },
   backgroundImage: {
     width: '100%',
     height: '100%',
-  },
+  },
   header: {
     fontSize: 24,
     fontWeight: 'bold',
