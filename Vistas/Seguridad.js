@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Linking } from 'react-native';
 import { Appbar } from 'react-native-paper'; // Importamos AppBar de react-native-paper
 import { useNavigation } from '@react-navigation/native'; // Para la navegación entre pantallas
 
@@ -23,14 +23,14 @@ const Seguridad = () => {
       <View style={styles.mainContent}>
         {/* Botones principales con imágenes */}
         <View style={styles.row}>
-          <TouchableOpacity style={styles.button}>
+          <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Soporte')}>
             <Image
               source={{ uri: 'https://img.icons8.com/ios-filled/50/000000/technical-support.png' }} // Imagen Soporte
               style={styles.iconImage}
             />
             <Text style={styles.buttonText}>Soporte</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.button}>
+          <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('ContactosEmergencia')}>
             <Image
               source={{ uri: 'https://img.icons8.com/ios-filled/50/000000/id-verified.png' }} // Imagen Verificación de identidad
               style={styles.iconImage}
@@ -40,7 +40,7 @@ const Seguridad = () => {
         </View>
 
         {/* Botón Llamar a emergencias */}
-        <TouchableOpacity style={styles.emergencyButton}>
+        <TouchableOpacity style={styles.emergencyButton} onPress={() => Linking.openURL('tel:111')}>
           <Text style={styles.emergencyText}>Llamar a emergencias</Text>
         </TouchableOpacity>
 
@@ -56,7 +56,7 @@ const Seguridad = () => {
             />
             <Text style={styles.buttonText}>Alertas de seguridad</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.button}>
+          <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Chat')}>
             <Image
               source={{ uri: 'https://img.icons8.com/ios-filled/50/000000/chat.png' }} // Imagen Chat de emergencias
               style={styles.iconImage}
@@ -73,16 +73,6 @@ const Seguridad = () => {
             />
             <Text style={styles.buttonText}>Zonas con más tráfico peatonal</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.button}>
-            <Image
-              source={{ uri: 'https://img.icons8.com/ios-filled/50/000000/marker.png' }} // Imagen Rutas seguras cercanas
-              style={styles.iconImage}
-            />
-            <Text style={styles.buttonText}>Rutas seguras cercanas</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.row}>
           <TouchableOpacity style={styles.button}>
             <Image
               source={{ uri: 'https://img.icons8.com/ios-filled/50/000000/shield.png' }} // Imagen Funciones de seguridad
