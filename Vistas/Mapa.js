@@ -551,6 +551,31 @@ export default function PantallaMapa() {
           >
             <RenderRuta coordenadasRuta={coordenadasRuta} zonasPeligrosas={zonasPeligrosas} />
 
+            {/* Mostrar los círculos y los marcadores de las zonas peligrosas */}
+            {zonasPeligrosas.map((zona) => (
+              <React.Fragment key={zona.id}>
+                {/* Círculo rojo alrededor de la zona peligrosa */}
+                <Circle
+                  center={{ latitude: zona.latitude, longitude: zona.longitude }}
+                  radius={zona.umbral} // Esto controlará el tamaño del círculo, ajusta según sea necesario
+                  strokeColor="rgba(255, 0, 0, 0.5)" // Color del borde del círculo
+                  fillColor="rgba(255, 0, 0, 0.2)"   // Color de relleno (rojo con transparencia)
+                />
+
+                {/* El marcador de la zona peligrosa */}
+                <Marker
+                  coordinate={{ latitude: zona.latitude, longitude: zona.longitude }}
+                  title={zona.descripcion}
+                >
+                  <Image
+                    source={obtenerIconoMarcador(zona.tipo)}  // Usa la función para obtener el ícono correcto
+                    style={{ width: 30, height: 30 }}  // Ajusta el tamaño del ícono si es necesario
+                  />
+                </Marker>
+              </React.Fragment>
+            ))}
+
+
             {/* Mostrar el marcador de inicio */}
             {origen && (
               <Marker coordinate={origen} anchor={{ x: 0.5, y: 1 }} draggable={false}>
@@ -932,7 +957,7 @@ const styles = StyleSheet.create({
     marginLeft: -24,
     marginTop: -48,
     position: 'absolute',
-    top: '35%',
+    top: '33%',
   },
   marker: {
     height: 30,

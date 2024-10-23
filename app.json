@@ -31,6 +31,11 @@
         "NSPhotoLibraryUsageDescription": "Allow $(PRODUCT_NAME) to access your photos.",
         "NSPhotoLibraryAddUsageDescription": "Allow $(PRODUCT_NAME) to save photos."
       }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "c2f8d8cc-b2fe-45bd-a6fc-43b4d3ecad9f"
+      }
     }
   }
 }
