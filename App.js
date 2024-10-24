@@ -15,6 +15,10 @@ import ContactosEmergencia from './Vistas/ContactosEmergencia';
 import Chat from './Vistas/Chat';
 import Ayuda from './Vistas/Ayuda';
 import CustomDrawerContent from './Componentes/CustomDrawerContent';
+import EditPerfil from  './Vistas/EditPerfil';
+import ChangePassword from './Vistas/ChangePassword';
+import Email from './Vistas/Email';
+import ChangeEmail from './Vistas/ChangeEmail';
 
 const Stack = createStackNavigator();
 const Drawer = createDrawerNavigator();
@@ -132,7 +136,10 @@ function RootStack() {
       <Stack.Screen name="Login" component={Inicio} />
       <Stack.Screen name="DrawerScreens" component={DrawerNavigator} />
       <Stack.Screen name="Registro" component={Registrar} />
-
+      <Stack.Screen name="EditPerfil" component={EditPerfil} />
+      <Stack.Screen name="Email" component={Email} />
+      <Stack.Screen name="ChangeEmail" component={ChangeEmail} />
+      <Stack.Screen name="ChangePassword" component={ChangePassword} />
     </Stack.Navigator>
   );
 }
