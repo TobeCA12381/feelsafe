@@ -19,7 +19,9 @@ import EditPerfil from  './Vistas/EditPerfil';
 import ChangePassword from './Vistas/ChangePassword';
 import Email from './Vistas/Email';
 import ChangeEmail from './Vistas/ChangeEmail';
-
+import DeleteAccount from './Vistas/DeleteAccount';
+import Idioma from './Vistas/Idioma';
+import Dispositivos from './Vistas/Dispositivos';
 const Stack = createStackNavigator();
 const Drawer = createDrawerNavigator();
 
@@ -59,9 +61,11 @@ function DrawerNavigator() {
       screenOptions={{
         headerShown: true,
         drawerStyle: {
-          backgroundColor: '#c6cbef',
+          backgroundColor: 'transparent',
           width: 240,
         },
+        drawerActiveBackgroundColor: '#434343', // Fondo amarillo para el elemento activo
+        drawerActiveTintColor: '#fff',          // Texto negro para el elemento activo
       }}
     >
       <Drawer.Screen
@@ -70,13 +74,6 @@ function DrawerNavigator() {
         options={{
           headerShown: false,
         }}
-      />
-      <Drawer.Screen
-        name="Usuario"
-        component={withFloatingMenu(UserCard)}
-        options={{
-           headerShown: false,
-         }}
       />
       <Drawer.Screen
         name="Seguridad"
@@ -92,19 +89,6 @@ function DrawerNavigator() {
           headerShown: false,
         }}
       />
-      <Drawer.Screen
-        name="Chat"
-        component={withFloatingMenu(Chat)}
-        options={{
-          headerShown: false,
-        }}
-      />
-      <Drawer.Screen name="ContactosEmergencia" 
-      component={ContactosEmergencia}
-      options={{
-        headerShown: false,
-      }} />
-
       <Drawer.Screen
         name="Ayuda"
         component={withFloatingMenu(Ayuda)}
@@ -136,10 +120,15 @@ function RootStack() {
       <Stack.Screen name="Login" component={Inicio} />
       <Stack.Screen name="DrawerScreens" component={DrawerNavigator} />
       <Stack.Screen name="Registro" component={Registrar} />
+      <Stack.Screen name="Chat" component={Chat} />
+      <Stack.Screen name="ContactosEmergencia" component={ContactosEmergencia} />
       <Stack.Screen name="EditPerfil" component={EditPerfil} />
       <Stack.Screen name="Email" component={Email} />
       <Stack.Screen name="ChangeEmail" component={ChangeEmail} />
       <Stack.Screen name="ChangePassword" component={ChangePassword} />
+      <Stack.Screen name="DeleteAccount" component={DeleteAccount} />
+      <Stack.Screen name="Idioma" component={Idioma} />
+      <Stack.Screen name="Dispositivos" component={Dispositivos} />
     </Stack.Navigator>
   );
 }
@@ -201,7 +190,6 @@ const styles = StyleSheet.create({
   botonMenu: {
     position: 'absolute',
     top: 10,
-    
     borderRadius: 25,
     padding: 10,
     zIndex: 1,
