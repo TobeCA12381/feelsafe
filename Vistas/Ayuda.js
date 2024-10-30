@@ -10,13 +10,6 @@ const Ayuda = () => {
     navigation.navigate('Asignar Ruta'); // Regresa a la ruta de tu menú principal
   };
 
-  // Datos para la primera lista de opciones (antes de "Quiero contactar con FeelSafe")
-  const problemas = [
-    { id: '1', text: 'No puedo registrar mi ruta' },
-    { id: '2', text: 'Mi cuenta ha sido bloqueada' },
-    { id: '3', text: 'Modificar datos personales' },
-  ];
-
   // Datos para la segunda lista de opciones de ayuda (FeelSafe)
   const opciones = [
     { id: '1', icon: 'https://img.icons8.com/ios-filled/50/000000/marker.png', text: 'Problema con la ruta' },
@@ -53,11 +46,6 @@ const Ayuda = () => {
 
       {/* ScrollView para permitir desplazamiento completo */}
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* Lista de problemas (antes de "Centro de ayuda") */}
-        <Text style={styles.headerText}>¿Cómo podemos ayudarte?</Text>
-        <Text style={styles.infoText}>Selecciona el motivo de consulta</Text>
-        {problemas.map((item) => renderProblema({ item }))}
-        
         <Text style={styles.headerText}>Centro de ayuda</Text>
         <Text style={styles.infoText}>Resuelve tus dudas sobre FeelSafe</Text>
         {opciones.map((item) => renderOpcion({ item }))}
@@ -72,7 +60,7 @@ const Ayuda = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#1c1c1c',
   },
   appBar: {
     backgroundColor: '#2b2b2b',
@@ -93,7 +81,7 @@ const styles = StyleSheet.create({
   headerText: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#000',
+    color: '#fff',
     marginTop: 20,
     marginLeft: 15,
   },

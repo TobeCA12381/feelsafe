@@ -98,15 +98,11 @@ const EditPerfil = () => {
         <Text style={styles.optionText}>Cambiar mi contraseña</Text>
         <IconButton icon="chevron-right" size={20} />
       </TouchableOpacity>
-      <TouchableOpacity style={styles.option}>
-        <Text style={styles.optionText}>Mis redes sociales</Text>
-        <IconButton icon="chevron-right" size={20} />
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.option}>
+      <TouchableOpacity style={styles.option} onPress={() => navigation.navigate('Dispositivos')}>
         <Text style={styles.optionText}>Mis dispositivos</Text>
         <IconButton icon="chevron-right" size={20} />
       </TouchableOpacity>
-      <TouchableOpacity style={styles.option}>
+      <TouchableOpacity style={styles.option} onPress={() => navigation.navigate('DeleteAccount')} >
         <Text style={styles.optionText}>Eliminar mi cuenta</Text>
         <IconButton icon="chevron-right" size={20} />
       </TouchableOpacity>
@@ -118,7 +114,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 20,
-    backgroundColor: '#fff',
+    backgroundColor: '#1c1c1c',
   },
   header: {
     flexDirection: 'row',
@@ -130,6 +126,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     flex: 1,
     textAlign: 'center',
+    color:'#fff',
   },
   profileSection: {
     flexDirection: 'row',
@@ -164,9 +161,10 @@ const styles = StyleSheet.create({
   },
   input: {
     borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
+    borderBottomColor: '#fff',
     fontSize: 16,
     paddingVertical: 5,
+    color:'#fff',
   },
   infoContainer: {
     marginBottom: 20,
@@ -178,6 +176,7 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: 16,
     marginTop: 5,
+    color:'#fff',
   },
   emailContainer: {
     flexDirection: 'row',
@@ -196,6 +195,7 @@ const styles = StyleSheet.create({
   },
   optionText: {
     fontSize: 16,
+    color: '#fff',
   },
 });
 

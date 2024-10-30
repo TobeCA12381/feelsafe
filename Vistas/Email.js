@@ -6,7 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 const Email = () => {
   const navigation = useNavigation();
   const currentEmail = "j***@gmail.com";
-  const verificationDate = "2020-11-22";
+  const verificationDate = "2024-10-22";
 
   return (
     <View style={styles.container}>
@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   changeButton: {
-    backgroundColor: '#FF4500',
+    backgroundColor: '#000000',
     borderRadius: 8,
     paddingVertical: 15,
     marginTop: 20,
