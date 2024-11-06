@@ -13,6 +13,7 @@ import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import RouteInputPanel from '../Componentes/RouteInputPanel'; // Asegúrate de que la ruta de importación sea correcta
+import Boton from '../Componentes/Boton';
 // Obtiene las dimensiones de la pantalla
 
 const UMBRAL_PELIGRO_METROS = 100;
@@ -36,6 +37,8 @@ export default function PantallaMapa() {
     latitudeDelta: 0.007,
     longitudeDelta: 0.007,
   });
+  const [mostrarRutaSegura, setMostrarRutaSegura] = useState(false);
+  const [mostrarRutaRapida, setMostrarRutaRapida] = useState(false);
   const [seguridadRuta, setSeguridadRuta] = useState('seguro');
   const [puntuacionSeguridad, setPuntuacionSeguridad] = useState(100);
   const [zonaSeleccionada, setZonaSeleccionada] = useState(null);
@@ -49,6 +52,7 @@ export default function PantallaMapa() {
   const [shareModalVisible, setShareModalVisible] = useState(false);
   const drawerRef = useRef(null);
   const [gpsEnabled, setGpsEnabled] = useState(false);
+  const [mostrarRutasAlternativas, setMostrarRutasAlternativas] = useState(false);
   const [coordenadasRutaAlternativas, setCoordenadasRutaAlternativas] = useState([]);
   // Función para abrir el modal
   const abrirModalPeligros = useCallback(() => {
@@ -247,7 +251,136 @@ export default function PantallaMapa() {
     }
   }, [origen, destino, modoViaje, zonasPeligrosas, setPuntuacionSeguridad]);
 
+  const mostrarOcultarRutasAlternativas = useCallback(() => {
+    if (!origen || !destino) {
+      console.warn('Origen o destino no están definidos. No se pueden mostrar rutas alternativas.');
+      Alert.alert('Error', 'Debe seleccionar un origen y un destino antes de mostrar rutas alternativas.');
+      return; // Detiene la ejecución si origen o destino son null
+    }
 
+    setMostrarRutasAlternativas(!mostrarRutasAlternativas);
+    if (!mostrarRutasAlternativas) {
+      obtenerRutasAlternativas();
+    }
+  }, [mostrarRutasAlternativas, origen, destino]);
+
+
+  const obtenerRutasAlternativas = async () => {
+    if (!origen || !destino) return;
+
+    try {
+      // 1. Ruta más segura: Calcular puntos seguros alejados de zonas peligrosas
+      const puntosSegurosCandidatos = zonasPeligrosas.map(zona => {
+        // Crear puntos de evasión a una distancia segura de cada zona peligrosa
+        const distanciaSegura = zona.umbral * 3;
+        return {
+          latitude: zona.latitude + (distanciaSegura / 111111),
+          longitude: zona.longitude + (distanciaSegura / (111111 * Math.cos(zona.latitude * Math.PI / 180)))
+        };
+      });
+
+      // Obtener ruta segura usando waypoints de evasión
+      const rutaSeguraParams = new URLSearchParams({
+        origin: `${origen.latitude},${origen.longitude}`,
+        destination: `${destino.latitude},${destino.longitude}`,
+        waypoints: `via:${puntosSegurosCandidatos.map(p => `${p.latitude},${p.longitude}`).join('|')}`,
+        mode: modoViaje,
+        key: GOOGLE_MAPS_APIKEY
+      });
+
+      // 2. Ruta más rápida: Directa sin consideraciones de seguridad
+      const rutaRapidaParams = new URLSearchParams({
+        origin: `${origen.latitude},${origen.longitude}`,
+        destination: `${destino.latitude},${destino.longitude}`,
+        mode: modoViaje,
+        key: GOOGLE_MAPS_APIKEY
+      });
+
+      // 3. Ruta equilibrada: Usar algunos puntos de evasión estratégicos
+      const puntosEquilibrados = puntosSegurosCandidatos.filter((_, index) => index % 2 === 0);
+      const rutaEquilibradaParams = new URLSearchParams({
+        origin: `${origen.latitude},${origen.longitude}`,
+        destination: `${destino.latitude},${destino.longitude}`,
+        waypoints: `via:${puntosEquilibrados.map(p => `${p.latitude},${p.longitude}`).join('|')}`,
+        mode: modoViaje,
+        key: GOOGLE_MAPS_APIKEY
+      });
+
+      // Obtener las tres rutas en paralelo
+      const [respuestaSegura, respuestaRapida, respuestaEquilibrada] = await Promise.all([
+        fetch(`https://maps.googleapis.com/maps/api/directions/json?${rutaSeguraParams}`),
+        fetch(`https://maps.googleapis.com/maps/api/directions/json?${rutaRapidaParams}`),
+        fetch(`https://maps.googleapis.com/maps/api/directions/json?${rutaEquilibradaParams}`)
+      ]);
+
+      const [datosSegura, datosRapida, datosEquilibrada] = await Promise.all([
+        respuestaSegura.json(),
+        respuestaRapida.json(),
+        respuestaEquilibrada.json()
+      ]);
+
+      let rutasAlternativas = [];
+
+      // Procesar y validar cada ruta
+      if (datosSegura.status === "OK" && datosSegura.routes.length > 0) {
+        const rutaSegura = {
+          coordenadas: decodificarPolilinea(datosSegura.routes[0].overview_polyline.points),
+          tipo: 'segura',
+          duracion: datosSegura.routes[0].legs[0].duration.text,
+          distancia: datosSegura.routes[0].legs[0].distance.text
+        };
+        rutasAlternativas.push(rutaSegura);
+      }
+
+      if (datosRapida.status === "OK" && datosRapida.routes.length > 0) {
+        const rutaRapida = {
+          coordenadas: decodificarPolilinea(datosRapida.routes[0].overview_polyline.points),
+          tipo: 'rapida',
+          duracion: datosRapida.routes[0].legs[0].duration.text,
+          distancia: datosRapida.routes[0].legs[0].distance.text
+        };
+        if (validarRutaUnica(rutaRapida, rutasAlternativas)) {
+          rutasAlternativas.push(rutaRapida);
+        }
+      }
+
+      if (datosEquilibrada.status === "OK" && datosEquilibrada.routes.length > 0) {
+        const rutaEquilibrada = {
+          coordenadas: decodificarPolilinea(datosEquilibrada.routes[0].overview_polyline.points),
+          tipo: 'equilibrada',
+          duracion: datosEquilibrada.routes[0].legs[0].duration.text,
+          distancia: datosEquilibrada.routes[0].legs[0].distance.text
+        };
+        if (validarRutaUnica(rutaEquilibrada, rutasAlternativas)) {
+          rutasAlternativas.push(rutaEquilibrada);
+        }
+      }
+
+      // Evaluar la seguridad de cada ruta
+      rutasAlternativas = rutasAlternativas.map(ruta => {
+        const { puntuacion } = verificarSeguridadLogaritmica(ruta.coordenadas, zonasPeligrosas);
+        return {
+          ...ruta,
+          puntuacion,
+          seguridad: puntuacion > 75 ? 'seguro' : puntuacion > 50 ? 'moderado' : 'peligroso'
+        };
+      });
+
+      setCoordenadasRutaAlternativas(rutasAlternativas);
+
+    } catch (error) {
+      console.error('Error al obtener rutas alternativas:', error);
+      Alert.alert('Error', 'No se pudieron obtener rutas alternativas');
+    }
+  };
+
+
+  const seleccionarRutaAlternativa = (ruta) => {
+    setCoordenadasRuta(ruta.coordenadas);
+    setSeguridadRuta(ruta.seguridad.nivel);
+    setPuntuacionSeguridad(ruta.seguridad.puntuacion);
+    setMostrarRutasAlternativas(false);
+  };
 
 
   const agruparZonasPorTipo = useCallback((zonas) => {
@@ -528,6 +661,141 @@ export default function PantallaMapa() {
     }
   }, [destino]);
 
+  const obtenerRutaSegura = async () => {
+    setLoading(true);
+    try {
+      const respuesta = await fetch(
+        `https://maps.googleapis.com/maps/api/directions/json?origin=${origen.latitude},${origen.longitude}&destination=${destino.latitude},${destino.longitude}&mode=${modoViaje}&alternatives=true&key=${GOOGLE_MAPS_APIKEY}`
+      );
+      const datos = await respuesta.json();
+  
+      if (datos.status === "OK" && datos.routes.length > 0) {
+        const rutasEvaluadas = datos.routes.map(ruta => {
+          const puntos = decodificarPolilinea(ruta.overview_polyline.points);
+          const { puntuacion } = verificarSeguridadLogaritmica(puntos, zonasPeligrosas);
+          return { puntos, puntuacion };
+        }).sort((a, b) => b.puntuacion - a.puntuacion); // Ordenar por puntuación
+  
+        const rutaMasSegura = rutasEvaluadas[0];
+        if (rutaMasSegura) {
+          setCoordenadasRuta(rutaMasSegura.puntos);
+          setPuntuacionSeguridad(rutaMasSegura.puntuacion);
+          setSeguridadRuta(
+            rutaMasSegura.puntuacion > 75 ? 'seguro' : 
+            rutaMasSegura.puntuacion > 50 ? 'moderado' : 'peligroso'
+          );
+          ajustarVistaRuta(rutaMasSegura.puntos);
+        }
+      }
+    } catch (error) {
+      console.error('Error al obtener ruta segura:', error);
+      Alert.alert('Error', 'No se pudo obtener una ruta alternativa segura');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const obtenerRutaRapida = async () => {
+    setLoading(true);
+    try {
+      // Para la ruta rápida, usamos optimize:true y evitamos waypoints
+      const respuesta = await fetch(
+        `https://maps.googleapis.com/maps/api/directions/json?origin=${origen.latitude},${origen.longitude}&destination=${destino.latitude},${destino.longitude}&mode=${modoViaje}&optimize=true&key=${GOOGLE_MAPS_APIKEY}`
+      );
+      const datos = await respuesta.json();
+
+      if (datos.status === "OK" && datos.routes.length > 0) {
+        // Tomamos la primera ruta que será la más rápida
+        const puntos = decodificarPolilinea(datos.routes[0].overview_polyline.points);
+        const { puntuacion } = verificarSeguridadLogaritmica(puntos, zonasPeligrosas);
+
+        setCoordenadasRuta(puntos);
+        setPuntuacionSeguridad(puntuacion);
+        setSeguridadRuta(
+          puntuacion > 75 ? 'seguro' :
+            puntuacion > 50 ? 'moderado' : 'peligroso'
+        );
+        ajustarVistaRuta(puntos);
+      }
+    } catch (error) {
+      console.error('Error al obtener ruta rápida:', error);
+      Alert.alert('Error', 'No se pudo obtener la ruta más rápida');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const obtenerRutaEquilibrada = async () => {
+    setLoading(true);
+    try {
+      // Para la ruta equilibrada, solicitamos múltiples alternativas
+      const respuesta = await fetch(
+        `https://maps.googleapis.com/maps/api/directions/json?origin=${origen.latitude},${origen.longitude}&destination=${destino.latitude},${destino.longitude}&mode=${modoViaje}&alternatives=true&key=${GOOGLE_MAPS_APIKEY}`
+      );
+      const datos = await respuesta.json();
+
+      if (datos.status === "OK" && datos.routes.length > 0) {
+        // Evaluamos todas las rutas disponibles
+        const rutasEvaluadas = datos.routes.map(ruta => {
+          const puntos = decodificarPolilinea(ruta.overview_polyline.points);
+          const { puntuacion } = verificarSeguridadLogaritmica(puntos, zonasPeligrosas);
+          const tiempoViaje = ruta.legs[0].duration.value;
+          const distancia = ruta.legs[0].distance.value;
+
+          // Calculamos un score combinado (seguridad y eficiencia)
+          const scoreSeguridad = puntuacion / 100;
+          const scoreEficiencia = 1 - (tiempoViaje / (30 * 60)); // Normalizado a 30 minutos
+          const scoreTotal = (scoreSeguridad * 0.5) + (scoreEficiencia * 0.5);
+
+          return {
+            puntos,
+            puntuacion,
+            tiempoViaje,
+            distancia,
+            scoreTotal
+          };
+        });
+
+        // Ordenamos por score total y tomamos la mejor ruta equilibrada
+        rutasEvaluadas.sort((a, b) => b.scoreTotal - a.scoreTotal);
+        const rutaEquilibrada = rutasEvaluadas[0];
+
+        setCoordenadasRuta(rutaEquilibrada.puntos);
+        setPuntuacionSeguridad(rutaEquilibrada.puntuacion);
+        setSeguridadRuta(
+          rutaEquilibrada.puntuacion > 75 ? 'seguro' :
+            rutaEquilibrada.puntuacion > 50 ? 'moderado' : 'peligroso'
+        );
+        ajustarVistaRuta(rutaEquilibrada.puntos);
+      }
+    } catch (error) {
+      console.error('Error al obtener ruta equilibrada:', error);
+      Alert.alert('Error', 'No se pudo obtener una ruta equilibrada');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sonRutasSimilares = (ruta1, ruta2) => {
+    // Compara puntos clave de las rutas
+    const puntosClaveRuta1 = ruta1.coordenadas[0];
+    const puntosClaveRuta2 = ruta2.coordenadas[0];
+
+    // Calcula la distancia entre puntos
+    const distancia = Math.sqrt(
+      Math.pow(puntosClaveRuta1.latitude - puntosClaveRuta2.latitude, 2) +
+      Math.pow(puntosClaveRuta1.longitude - puntosClaveRuta2.longitude, 2)
+    );
+
+    // Si la distancia es menor a cierto umbral, las rutas son similares
+    return distancia < 0.0005; // Ajusta este valor según necesites
+  };
+
+  const validarRutaUnica = (nuevaRuta, rutasExistentes) => {
+    return !rutasExistentes.some(rutaExistente =>
+      sonRutasSimilares(nuevaRuta, rutaExistente)
+    );
+  };
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
@@ -546,39 +814,40 @@ export default function PantallaMapa() {
             ref={mapRef}
             style={styles.mapa}
             region={regionMapa}
-            onRegionChange={!rutaGenerada ? onRegionChange : undefined} // Desactivar movimientos cuando la ruta está generada
+            onRegionChange={!rutaGenerada ? onRegionChange : undefined}
             onRegionChangeComplete={!rutaGenerada ? onRegionChangeComplete : undefined}
           >
-            <RenderRuta coordenadasRuta={coordenadasRuta} zonasPeligrosas={zonasPeligrosas} />
-
-            {/* Mostrar los círculos y los marcadores de las zonas peligrosas */}
+            {/* Zonas Peligrosas - Círculos e Íconos */}
             {zonasPeligrosas.map((zona) => (
               <React.Fragment key={zona.id}>
-                {/* Círculo rojo alrededor de la zona peligrosa */}
                 <Circle
-                  center={{ latitude: zona.latitude, longitude: zona.longitude }}
-                  radius={zona.umbral} // Esto controlará el tamaño del círculo, ajusta según sea necesario
-                  strokeColor="rgba(255, 0, 0, 0.5)" // Color del borde del círculo
-                  fillColor="rgba(255, 0, 0, 0.2)"   // Color de relleno (rojo con transparencia)
+                  center={{
+                    latitude: zona.latitude,
+                    longitude: zona.longitude
+                  }}
+                  radius={zona.umbral}
+                  fillColor="rgba(255, 0, 0, 0.1)"
+                  strokeColor="rgba(255, 0, 0, 0.4)"
+                  strokeWidth={2}
                 />
-
-                {/* El marcador de la zona peligrosa */}
                 <Marker
-                  coordinate={{ latitude: zona.latitude, longitude: zona.longitude }}
+                  coordinate={{
+                    latitude: zona.latitude,
+                    longitude: zona.longitude
+                  }}
                   title={zona.descripcion}
                 >
                   <Image
-                    source={obtenerIconoMarcador(zona.tipo)}  // Usa la función para obtener el ícono correcto
-                    style={{ width: 30, height: 30 }}  // Ajusta el tamaño del ícono si es necesario
+                    source={obtenerIconoMarcador(zona.tipo)}
+                    style={{ width: 35, height: 35, resizeMode: 'contain' }}
                   />
                 </Marker>
               </React.Fragment>
             ))}
 
-
-            {/* Mostrar el marcador de inicio */}
+            {/* Marcadores de Origen y Destino */}
             {origen && (
-              <Marker coordinate={origen} anchor={{ x: 0.5, y: 1 }} draggable={false}>
+              <Marker coordinate={origen} anchor={{ x: 0.5, y: 1 }}>
                 <Image
                   source={require('../assets/inicio.png')}
                   style={styles.markerImage}
@@ -586,9 +855,8 @@ export default function PantallaMapa() {
               </Marker>
             )}
 
-            {/* Mostrar el marcador de destino */}
             {destino && (
-              <Marker coordinate={destino} anchor={{ x: 0.5, y: 1 }} draggable={false}>
+              <Marker coordinate={destino} anchor={{ x: 0.5, y: 1 }}>
                 <Image
                   source={require('../assets/destino.png')}
                   style={styles.markerImage}
@@ -596,20 +864,39 @@ export default function PantallaMapa() {
               </Marker>
             )}
 
-            {colorearRuta(coordenadasRuta, zonasPeligrosas).map((segmento, index) => (
-              <Polyline
-                key={index}
-                coordinates={segmento.coordenadas}
-                strokeColor={segmento.color}
-                strokeWidth={3}
-              />
-            ))}
+            {/* Sistema de Rutas */}
+            {coordenadasRuta.length > 0 && (
+              <>
+                {/* Ruta Principal */}
+                {colorearRuta(coordenadasRuta, zonasPeligrosas).map((segmento, index) => (
+                  <Polyline
+                    key={`main-${index}`}
+                    coordinates={segmento.coordenadas}
+                    strokeColor={segmento.color}
+                    strokeWidth={4}
+                    zIndex={1}
+                  />
+                ))}
+
+                {/* Rutas Alternativas */}
+                {mostrarRutasAlternativas && coordenadasRutaAlternativas.map((ruta, rutaIndex) =>
+                  colorearRuta(ruta.coordenadas, zonasPeligrosas).map((segmento, segIndex) => (
+                    <Polyline
+                      key={`alt-${rutaIndex}-${segIndex}`}
+                      coordinates={segmento.coordenadas}
+                      strokeColor={segmento.color}
+                      strokeWidth={4}
+                      strokeDashPattern={[20, 15]}
+                      opacity={0.8}
+                      zIndex={0}
+                      tappable={true}
+                      onPress={() => seleccionarRutaAlternativa(ruta)}
+                    />
+                  ))
+                )}
+              </>
+            )}
           </MapView>
-
-
-
-
-
 
 
 
@@ -769,7 +1056,39 @@ export default function PantallaMapa() {
           )}
         </View>
       </ViewShot>
+      {origen && destino ? (
+        <View style={styles.botonesRutas}>
+          <TouchableOpacity
+            style={[
+              styles.botonRuta,
+              mostrarRutaSegura && styles.botonRutaActivo
+            ]}
+            onPress={async () => {
+              if (!mostrarRutaSegura) {
+                setMostrarRutaSegura(true);
+                await obtenerRutaSegura();
+              } else {
+                setMostrarRutaSegura(false);
+                await obtenerRuta(); // Volver a la ruta principal/rápida
+              }
+            }}
+          >
+            <Ionicons
+              name="shield"
+              size={20}
+              color="#FFF"
+              style={{ marginRight: 5 }}
+            />
+            <Text style={styles.textoBotonRuta}>
+              {mostrarRutaSegura ? 'Ruta Principal' : 'Ruta Segura'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
+
     </SafeAreaView>
+
   );
 
 
@@ -779,6 +1098,55 @@ export default function PantallaMapa() {
 
 
 const styles = StyleSheet.create({
+  botonesRutas: {
+    position: 'absolute',
+    bottom: 100,
+    right: 20,
+    gap: 10,
+  },
+  botonRuta: {
+    backgroundColor: '#333',
+    padding: 12,
+    borderRadius: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  botonRutaActivo: {
+    backgroundColor: '#2196F3',
+  },
+  textoBotonRuta: {
+    color: '#FFF',
+    marginLeft: 8,
+    fontWeight: '500',
+  },
+  botonRutasAlternativas: {
+    position: 'absolute',
+    bottom: 100,
+    right: 20,
+    backgroundColor: '#1a1a1a',
+    padding: 12,
+    borderRadius: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  textoBotonRutas: {
+    color: '#FFF',
+    fontWeight: '500',
+    marginLeft: 8,
+  },
   container: {
     flex: 1,
     justifyContent: 'center',
@@ -957,7 +1325,7 @@ const styles = StyleSheet.create({
     marginLeft: -24,
     marginTop: -48,
     position: 'absolute',
-    top: '33%',
+    top: '32.8%',
   },
   marker: {
     height: 30,
