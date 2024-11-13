@@ -1,21 +1,27 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, Linking } from 'react-native';
-import { Appbar } from 'react-native-paper'; // Importamos AppBar de react-native-paper
-import { useNavigation } from '@react-navigation/native'; // Para la navegación entre pantallas
+import React from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Image,
+  Linking,
+} from "react-native";
+import { Appbar } from "react-native-paper"; // Importamos AppBar de react-native-paper
+import { useNavigation } from "@react-navigation/native"; // Para la navegación entre pantallas
 
 const Seguridad = () => {
-
   const navigation = useNavigation();
 
   const handleBackPress = () => {
-    navigation.navigate('Asignar Ruta'); // Regresa a la ruta de tu menú principal
+    navigation.navigate("Asignar Ruta"); // Regresa a la ruta de tu menú principal
   };
 
   return (
     <View style={styles.container}>
       {/* AppBar */}
       <Appbar.Header style={styles.appBar}>
-        <Appbar.BackAction onPress={handleBackPress} color="#FFF" left={10}/>
+        <Appbar.BackAction onPress={handleBackPress} color="#FFF" left={10} />
         <Appbar.Content title="Seguridad" titleStyle={styles.appBarTitle} />
       </Appbar.Header>
 
@@ -23,16 +29,26 @@ const Seguridad = () => {
       <View style={styles.mainContent}>
         {/* Botones principales con imágenes */}
         <View style={styles.row}>
-          <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Soporte')}>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() => navigation.navigate("Soporte")}
+          >
             <Image
-              source={{ uri: 'https://img.icons8.com/ios-filled/50/000000/technical-support.png' }} // Imagen Soporte
+              source={{
+                uri: "https://img.icons8.com/ios-filled/50/000000/technical-support.png",
+              }} // Imagen Soporte
               style={styles.iconImage}
             />
             <Text style={styles.buttonText}>Soporte</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('ContactosEmergencia')}>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() => navigation.navigate("ContactosEmergencia")}
+          >
             <Image
-              source={{ uri: 'https://img.icons8.com/ios-filled/50/000000/id-verified.png' }} // Imagen Verificación de identidad
+              source={{
+                uri: "https://img.icons8.com/ios-filled/50/000000/id-verified.png",
+              }} // Imagen Verificación de identidad
               style={styles.iconImage}
             />
             <Text style={styles.buttonText}>Contactos de emergencia</Text>
@@ -40,7 +56,10 @@ const Seguridad = () => {
         </View>
 
         {/* Botón Llamar a emergencias */}
-        <TouchableOpacity style={styles.emergencyButton} onPress={() => Linking.openURL('tel:111')}>
+        <TouchableOpacity
+          style={styles.emergencyButton}
+          onPress={() => Linking.openURL("tel:105")}
+        >
           <Text style={styles.emergencyText}>Llamar a emergencias</Text>
         </TouchableOpacity>
 
@@ -51,14 +70,21 @@ const Seguridad = () => {
         <View style={styles.row}>
           <TouchableOpacity style={styles.button}>
             <Image
-              source={{ uri: 'https://img.icons8.com/ios-filled/50/000000/bell.png' }} // Imagen Alertas de seguridad
+              source={{
+                uri: "https://img.icons8.com/ios-filled/50/000000/bell.png",
+              }} // Imagen Alertas de seguridad
               style={styles.iconImage}
             />
             <Text style={styles.buttonText}>Alertas de seguridad</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Chat')}>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() => navigation.navigate("Chat")}
+          >
             <Image
-              source={{ uri: 'https://img.icons8.com/ios-filled/50/000000/chat.png' }} // Imagen Chat de emergencias
+              source={{
+                uri: "https://img.icons8.com/ios-filled/50/000000/chat.png",
+              }} // Imagen Chat de emergencias
               style={styles.iconImage}
             />
             <Text style={styles.buttonText}>Chat de emergencias 24/7</Text>
@@ -66,16 +92,25 @@ const Seguridad = () => {
         </View>
 
         <View style={styles.row}>
-          <TouchableOpacity style={styles.button}>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() => navigation.navigate("Reportar")}
+          >
             <Image
-              source={{ uri: 'https://img.icons8.com/ios-filled/50/000000/walking.png' }} // Imagen Zonas con tráfico peatonal
+              source={{
+                uri: "https://img.icons8.com/ios-filled/50/000000/siren.png",
+              }} // Reportar incidentes o emergencias
               style={styles.iconImage}
             />
-            <Text style={styles.buttonText}>Zonas con más tráfico peatonal</Text>
+            <Text style={styles.buttonText}>
+              Reportar incidentes o emergencias
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.button}>
             <Image
-              source={{ uri: 'https://img.icons8.com/ios-filled/50/000000/shield.png' }} // Imagen Funciones de seguridad
+              source={{
+                uri: "https://img.icons8.com/ios-filled/50/000000/shield.png",
+              }} // Imagen Funciones de seguridad
               style={styles.iconImage}
             />
             <Text style={styles.buttonText}>Funciones de seguridad</Text>
@@ -89,15 +124,15 @@ const Seguridad = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1c1c1c',
+    backgroundColor: "#1c1c1c",
   },
   appBar: {
-    backgroundColor: '#2b2b2b',
-    left: 30
+    backgroundColor: "#2b2b2b",
+    left: 30,
   },
   appBarTitle: {
-    color: '#fff',
-    left: 15
+    color: "#fff",
+    left: 15,
   },
   mainContent: {
     flex: 1,
@@ -105,46 +140,46 @@ const styles = StyleSheet.create({
   },
   header: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontWeight: "bold",
+    color: "#fff",
     marginBottom: 20,
-    textAlign: 'center',
+    textAlign: "center",
   },
   row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: 20,
   },
   button: {
     flex: 1,
-    backgroundColor: '#2b2b2b',
+    backgroundColor: "#2b2b2b",
     padding: 15,
     margin: 5,
     borderRadius: 10,
-    alignItems: 'center',
+    alignItems: "center",
   },
   buttonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    textAlign: 'center',
+    textAlign: "center",
     marginTop: 10,
   },
   emergencyButton: {
-    backgroundColor: '#ff5c5c',
+    backgroundColor: "#ff5c5c",
     padding: 15,
     borderRadius: 10,
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 20,
   },
   emergencyText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   sectionTitle: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 10,
   },
   iconImage: {
